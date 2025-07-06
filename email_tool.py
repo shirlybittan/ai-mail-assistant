@@ -4,7 +4,7 @@ import yagmail
 import datetime # Added for timestamping logs
 
 # Import from config.py
-from config import GMAIL_USER, GMAIL_APP_PASSWORD, FAILED_EMAILS_LOG_PATH
+from config import SENDER_EMAIL, SENDER_PASSWORD, FAILED_EMAILS_LOG_PATH
 
 def _log_failed_email_to_file(to_email: str, subject: str, body: str, reason: str):
     """Logs details of a failed email to a local text file."""
@@ -23,8 +23,8 @@ def _log_failed_email_to_file(to_email: str, subject: str, body: str, reason: st
 def send_email_message(to_email: str, subject: str, body: str) -> dict:
     """Sends an email via Yagmail (Gmail SMTP)."""
     
-    if not all([GMAIL_USER, GMAIL_APP_PASSWORD]):
-        return {"status": "error", "message": "Gmail credentials (GMAIL_USER, GMAIL_APP_PASSWORD) not fully configured in .env.", "log_to_file": True}
+    if not all([SENDER_EMAIL, SENDER_PASSWORD]):
+        return {"status": "error", "message": "Gmail credentials (SENDER_EMAIL, SENDER_PASSWORD) not fully configured in .env.", "log_to_file": True}
     if not to_email.strip():
         return {"status": "error", "message": "Email 'to_email' cannot be empty.", "log_to_file": False} # Don't log if recipient is empty
     if not subject.strip():
@@ -37,7 +37,7 @@ def send_email_message(to_email: str, subject: str, body: str) -> dict:
         return {"status": "error", "message": f"Invalid email format for: {to_email}", "log_to_file": False} # Don't log if format is invalid
 
     try:
-        yag = yagmail.SMTP(user=GMAIL_USER, password=GMAIL_APP_PASSWORD)
+        yag = yagmail.SMTP(user=SENDER_EMAIL, password=SENDER_PASSWORD)
         
         yag.send(
             to=to_email,
