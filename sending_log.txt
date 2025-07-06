@@ -1,0 +1,37 @@
+[22:09:26] Application started. (Current Time: 2025-07-06 22:09:26)
+[22:09:26] Sending log saved to: sending_log.txt
+[22:09:26] Failed emails log saved to: failed_emails_log.txt
+[22:09:32] Selected file: C:/Users/shirl/ai-message-sender/dummy_contacts_email.xlsx
+[22:09:33] Loaded 4 valid contacts from Excel.
+[22:09:33] WARNING: Some contacts had issues (e.g., missing/invalid/duplicate emails). They will be skipped.
+[22:09:33]   - Row 5: Invalid email format for 'invalid-email' (Eve Davis).
+[22:09:33]   - Row 7: Invalid email format for 'nan' (No Email).
+[22:10:28] Generating email preview for the first contact. This may take a moment...
+[22:10:28] Using first contact for preview: bittanshirly Smith
+[22:10:31] Email preview generated successfully.
+[22:10:39] Email sending process initiated...
+[22:10:39] 
+--- [1/4] Processing contact: bittanshirly Smith (bittanshirly@gmail.com) ---
+[22:10:39]   Generating personalized email for bittanshirly Smith...
+[22:10:43]   Attempting Email for bittanshirly Smith...
+[22:10:44]     - Email: success - Email sent to bittanshirly@gmail.com successfully.
+[22:10:44] 
+--- [2/4] Processing contact: serge Johnson (bittanserge@gmail.com) ---
+[22:10:44]   Generating personalized email for serge Johnson...
+[22:10:48]   Attempting Email for serge Johnson...
+[22:10:50]     - Email: success - Email sent to bittanserge@gmail.com successfully.
+[22:10:50] 
+--- [3/4] Processing contact: shirlyBittan Brown (shirlybittan@gmail.com) ---
+[22:10:50]   Generating personalized email for shirlyBittan Brown...
+[22:10:52]   Attempting Email for shirlyBittan Brown...
+[22:10:54]     - Email: success - Email sent to shirlybittan@gmail.com successfully.
+[22:10:54] 
+--- [4/4] Processing contact: Duplicate Alice (alice@example.com) ---
+[22:10:54]   Generating personalized email for Duplicate Alice...
+[22:10:57]   Attempting Email for Duplicate Alice...
+[22:10:59]     - Email: success - Email sent to alice@example.com successfully.
+[22:10:59] 
+--- Sending Complete ---
+[22:10:59] Total contacts processed: 4
+[22:10:59] Successful emails sent: 4
+[22:10:59] Failed or Skipped emails: 0
