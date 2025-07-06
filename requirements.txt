@@ -2,7 +2,6 @@ pandas
 openai
 yagmail
 python-dotenv
-customtkinter
 langchain
 langchain-openai
 openpyxl

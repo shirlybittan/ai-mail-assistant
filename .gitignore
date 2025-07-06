@@ -1,3 +1,4 @@
 .env
+dummy_contacts_email.xlsx
 __pycache__/
 *.pyc
