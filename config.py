@@ -9,7 +9,7 @@ load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Yagmail (Gmail) Credentials
-SENDER_EMAIL  = os.getenv("SENDER_EMAIL ")
+SENDER_EMAIL  = os.getenv("SENDER_EMAIL")
 SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")
 
 # Logging settings
