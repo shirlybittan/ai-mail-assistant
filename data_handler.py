@@ -1,81 +1,93 @@
-# data_handler.py (MODIFIED for email validation)
+# data_handler.py
 import pandas as pd
-import re # Added for robust email validation
-
-def is_valid_email(email):
-    """Basic regex for email validation."""
-    if not isinstance(email, str):
-        return False
-    return re.match(r"[^@]+@[^@]+\.[^@]+", email) is not None
+import re # Import regex for more robust email pattern checking
 
 def load_contacts_from_excel(file_path):
     """
-    Loads contact data from an Excel file into a list of dictionaries.
-    Assumes columns like 'Name', 'Email'.
-    Performs validation for email addresses.
-    Returns contacts and a list of issues (e.g., invalid/duplicate emails).
+    Loads contacts from an Excel file, dynamically identifies 'email' and 'name' columns,
+    and returns a list of dictionaries with 'name' and 'email' keys.
     """
-    contacts = []
-    issues = []
-    seen_emails = set()
-
     try:
         df = pd.read_excel(file_path)
-
-        df.columns = [col.lower().replace(' ', '_') for col in df.columns]
-
-        required_cols = ['name', 'email']
-        for col in required_cols:
-            if col not in df.columns:
-                df[col] = '' 
-
-        for index, row in df.iterrows():
-            contact = row.to_dict()
-            email = str(contact.get('email', '') or '').strip()
-            name = contact.get('name', 'Unnamed Contact').strip()
-
-            contact_issues = []
-
-            if not email:
-                contact_issues.append(f"Row {index+2}: Missing email for {name}.")
-            elif not is_valid_email(email):
-                contact_issues.append(f"Row {index+2}: Invalid email format for '{email}' ({name}).")
-            elif email in seen_emails:
-                contact_issues.append(f"Row {index+2}: Duplicate email '{email}' for {name}.")
-            else:
-                seen_emails.add(email)
-                contacts.append(contact)
-            
-            if contact_issues:
-                issues.extend(contact_issues)
-
-        return contacts, issues
-    except FileNotFoundError:
-        issues.append(f"Error: File not found at {file_path}")
-        return [], issues
     except Exception as e:
-        issues.append(f"Error loading Excel file: {e}")
-        return [], issues
+        # Catch errors if the file is not a valid Excel or unreadable
+        return [], [f"Error reading Excel file: {e}. Please ensure it's a valid .xlsx or .xls file."]
 
-if __name__ == '__main__':
-    # --- For Testing: Create a dummy Excel file ---
-    dummy_data = {
-        'Name': ['Alice Smith', 'Bob Johnson', 'Charlie Brown', 'Eve Davis', 'Duplicate Alice'],
-        'Email': ['alice@example.com', '', 'charlie@example.com', 'eve@example.com', 'alice@example.com'] # Added duplicate
-    }
-    dummy_df = pd.DataFrame(dummy_data)
-    dummy_df.to_excel('dummy_contacts_email.xlsx', index=False)
-    print("Dummy Excel file 'dummy_contacts_email.xlsx' created.")
+    # Standardize column names to lowercase for easier internal handling
+    # Also strip any leading/trailing whitespace from column names
+    df.columns = [col.strip().lower() for col in df.columns]
 
-    # --- For Testing: Load the dummy Excel file ---
-    contacts, issues = load_contacts_from_excel('dummy_contacts_email.xlsx')
-    print("\nLoaded contacts (valid only):")
-    for contact in contacts:
-        print(contact)
+    email_col_name = None
+    name_col_name = None
+
+    # --- Strategy for Email Column Detection ---
+    # Prioritize exact 'email' or common 'mail' spellings first
+    common_email_names = ['email', 'mail', 'e-mail', 'adresse email', 'courriel']
+    for common_name in common_email_names:
+        if common_name in df.columns:
+            email_col_name = common_name
+            break # Found a direct match, use it
+
+    # If not found by common names, try to detect based on content (presence of '@' and a dot)
+    if not email_col_name:
+        for col in df.columns:
+            # Convert column to string type to handle mixed types gracefully
+            col_series = df[col].astype(str).dropna() # Drop NaN/empty strings for accurate percentage
+
+            # Define a more robust email pattern for content-based detection
+            # This regex checks for something@something.domain
+            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+            
+            # Count how many non-empty cells contain an email-like pattern
+            email_like_count = col_series.str.contains(email_pattern, regex=True, na=False).sum()
+            
+            # Consider a column an email column if a significant percentage (e.g., > 50%) of its values look like emails
+            if len(col_series) > 0 and (email_like_count / len(col_series)) >= 0.5: # 50% threshold for confidence
+                email_col_name = col
+                break # Found a strong candidate, take the first one encountered
+
+    if not email_col_name:
+        # If still no email column found, return an error message
+        return [], ["Could not find a suitable 'Email' column. Please ensure your Excel has a column with email addresses (e.g., 'Email', 'Mail', 'Courriel') or that most entries contain an '@' symbol and a domain."]
+
+
+    # --- Strategy for Name Column Detection ---
+    # Prioritize common 'name' spellings in English and French
+    common_name_columns = ['name', 'full name', 'first name', 'last name', 'nom', 'prenom', 'contact', 'contacts']
+    for common_name in common_name_columns:
+        if common_name in df.columns and common_name != email_col_name:
+            name_col_name = common_name
+            break # Found a direct match, use it
+            
+    # If no common name column, pick the first non-email column available
+    if not name_col_name:
+        for col in df.columns:
+            if col != email_col_name:
+                name_col_name = col
+                break
     
-    print("\nIssues found during loading:")
-    if issues:
-        for issue in issues:
-            print(f"- {issue}")
-    else:
-        print("No issues found.")
+    # If still no name column found (e.g., only email column exists), we will use a fallback name below
+    
+    # --- Process Contacts ---
+    contacts = []
+    contact_issues = []
+
+    for index, row in df.iterrows():
+        # Get email using the identified column, defaulting to empty string if not found or NaN
+        email = str(row[email_col_name]).strip() if pd.notna(row[email_col_name]) else ''
+        
+        # Get name using the identified column, defaulting to "Contact X" if not found or NaN
+        if name_col_name and pd.notna(row.get(name_col_name)):
+            name = str(row[name_col_name]).strip()
+        else:
+            name = f"Contact {index + 1}" # Fallback if no name column or name is missing
+
+        # Basic email validation: must not be empty and must contain '@'
+        # This is the primary validation done here, more comprehensive checks can be in send_email_message if needed
+        if email and '@' in email:
+            contacts.append({"name": name, "email": email})
+        else:
+            # Log issues including the name detected, even if it's a fallback "Contact X"
+            contact_issues.append(f"Row {index + 2}: Invalid or missing email for '{name}' (Email: '{email}').") # +2 for header row and 0-indexing
+
+    return contacts, contact_issues
