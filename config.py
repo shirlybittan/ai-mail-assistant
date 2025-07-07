@@ -5,21 +5,24 @@ import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Define log file paths relative to BASE_DIR
-LOG_FILE_PATH = os.path.join(BASE_DIR, 'sending_log.txt') # Changed to sending_log.txt for clarity
+LOG_FILE_PATH = os.path.join(BASE_DIR, 'sending_log.txt')
 FAILED_EMAILS_LOG_PATH = os.path.join(BASE_DIR, 'failed_emails_log.txt')
 
-# Your email credentials
-# It's HIGHLY RECOMMENDED to use Streamlit Secrets or environment variables
+# Retrieve sensitive information from Streamlit Secrets / Environment variables
+# Use .get() for safety, but then explicitly check for None
 SENDER_EMAIL = os.getenv("SENDER_EMAIL")
-SENDER_PASSWORD = os.getenv("SENDER_PASSWORD") # This should be your App Password
-
-# OpenAI API Key (if not already set as an environment variable in Streamlit Cloud)
+SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# Add a check for essential variables
-if not SENDER_EMAIL or not SENDER_PASSWORD:
-    print("WARNING: SENDER_EMAIL or SENDER_PASSWORD environment variables are not set in config.py or Streamlit Secrets.")
-    print("Email sending will fail.")
-
+# Explicitly check and raise an error if critical environment variables are not set
+if not SENDER_EMAIL:
+    raise ValueError("Streamlit Secret 'SENDER_EMAIL' is not set or not accessible. Please configure it in your Streamlit Cloud app settings.")
+if not SENDER_PASSWORD:
+    raise ValueError("Streamlit Secret 'SENDER_PASSWORD' is not set or not accessible. Please configure it in your Streamlit Cloud app settings (use an App Password).")
 if not OPENAI_API_KEY:
-    print("WARNING: OPENAI_API_KEY environment variable is not set. AI functions may not work.")
+    raise ValueError("Streamlit Secret 'OPENAI_API_KEY' is not set or not accessible. Please configure it in your Streamlit Cloud app settings.")
+
+# (Optional) Ensure log directory exists, though streamlit_app.py also handles this.
+# _log_dir = os.path.dirname(LOG_FILE_PATH)
+# if not os.path.exists(_log_dir):
+#     os.makedirs(_log_dir, exist_ok=True)
