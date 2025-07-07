@@ -52,11 +52,10 @@ if 'app_just_started' not in st.session_state:
 if 'show_reset_button' not in st.session_state:
     st.session_state.show_reset_button = False
 
-# Initialize prompt_input and personalized_mode if they don't exist
-if 'prompt_input' not in st.session_state:
-    st.session_state.prompt_input = "Generate a friendly welcome email for new subscribers. Introduce our services and offer a special first-time discount code: NEWUSER10."
-if 'personalized_mode' not in st.session_state:
-    st.session_state.personalized_mode = False
+# Initialize prompt_input and personalized_mode via .get() for robustness
+# No explicit 'if not in st.session_state' blocks here anymore for default values,
+# as the widget's 'value' parameter will handle it via .get()
+# if they don't exist in session_state.
 
 # --- Helper Function for Logging ---
 def log_message(message: str, is_error: bool = False):
@@ -103,7 +102,6 @@ if st.session_state.app_just_started:
         log_message("WARNING: OpenAI API Key (OPENAI_API_KEY) is not set. AI features may not work.", is_error=True)
     st.session_state.app_just_started = False
 
-# ... (rest of your sidebar and email generation settings) ...
 st.sidebar.header("Configuration")
 
 uploaded_file = st.sidebar.file_uploader("Upload Contacts Excel File", type=["xlsx", "xls"])
@@ -116,7 +114,7 @@ if uploaded_file is not None:
     log_message(f"Selected file: {uploaded_file.name}")
     
     st.session_state.contacts, st.session_state.contact_issues = load_contacts_from_excel(temp_file_path)
-    log_message(f"DEBUG: Loaded contacts: {st.session_state.contacts}")
+    log_message(f"DEBUG: Loaded contacts: {st.session_state.contacts}") # Keep this debug line for now
     
     try:
         os.remove(temp_file_path)
@@ -143,14 +141,14 @@ st.header("Email Generation Settings")
 
 personalized_checkbox = st.checkbox(
     "Generate personalized email for each contact (uses more AI tokens)",
-    value=st.session_state.personalized_mode,
+    value=st.session_state.get('personalized_mode', False), # Use .get() for default
     key="personalized_mode"
 )
 
 st.subheader("Email Content Generation Prompt (AI will use this)")
 user_prompt = st.text_area(
     "Enter your prompt here:",
-    value=st.session_state.prompt_input,
+    value=st.session_state.get('prompt_input', "Generate a friendly welcome email for new subscribers. Introduce our services and offer a special first-time discount code: NEWUSER10."), # Use .get() for default
     height=150,
     key="prompt_input"
 )
@@ -167,7 +165,8 @@ if st.button("Generate Preview (for first contact)"):
         with st.spinner("Generating preview..."):
             try:
                 first_contact = st.session_state.contacts[0]
-                log_message(f"Using first contact for preview: {first_contact.get('Name', 'Unnamed Contact')}")
+                # FIX: Changed 'Name' to 'name' for accessing the key
+                log_message(f"Using first contact for preview: {first_contact.get('name', 'Unnamed Contact')}")
 
                 preview_data = st.session_state.agent.generate_email_preview(user_prompt, first_contact)
                 
@@ -202,8 +201,8 @@ with col1_send_btn:
             log_message("Attempted send without contacts.", is_error=True)
             st.session_state.awaiting_confirmation = False
         else:
-            st.session_state.user_prompt_for_send = st.session_state.prompt_input
-            st.session_state.personalized_mode_for_send = st.session_state.personalized_mode
+            st.session_state.user_prompt_for_send = user_prompt # Use the current value of user_prompt, which is tied to 'prompt_input' key
+            st.session_state.personalized_mode_for_send = personalized_checkbox # Use the current value of personalized_checkbox, which is tied to 'personalized_mode' key
 
             email_subject_template = st.session_state.email_subject_preview.strip()
             email_body_template = st.session_state.email_body_preview.strip()
@@ -252,8 +251,9 @@ if st.session_state.awaiting_confirmation:
                         current_user_prompt = st.session_state.user_prompt_for_send
                         is_personalized = st.session_state.personalized_mode_for_send
 
-                        contact_name = contact.get("Name", f"Contact {i+1}")
-                        contact_email = contact.get("Email", '').strip()
+                        # FIX: Changed 'Name' to 'name' and 'Email' to 'email' for accessing dictionary keys
+                        contact_name = contact.get("name", f"Contact {i+1}") 
+                        contact_email = contact.get("email", '').strip()
                         
                         progress_text_placeholder.text(f"Sending to {contact_name} ({i+1}/{num_contacts})...")
 
