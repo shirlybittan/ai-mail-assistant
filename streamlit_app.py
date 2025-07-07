@@ -37,6 +37,8 @@ if 'user_prompt_for_send' not in st.session_state:
     st.session_state.user_prompt_for_send = ""
 if 'personalized_mode_for_send' not in st.session_state:
     st.session_state.personalized_mode_for_send = False
+if 'app_just_started' not in st.session_state: # Flag to ensure initial logs only run once per app start
+    st.session_state.app_just_started = True
 
 # --- Helper Function for Logging ---
 def log_message(message: str, is_error: bool = False):
@@ -77,8 +79,7 @@ st.set_page_config(
 st.title("📧 Smart Email Messenger AI Agent")
 
 # Initial Log Messages (only add these once on first run or after clearing session state)
-# Check if log_messages is empty OR if the app just started fresh (e.g., after a full reset)
-if not st.session_state.log_messages or st.session_state.get('app_just_started', True):
+if st.session_state.app_just_started:
     log_message(f"Application started. (Current Time: {time.strftime('%Y-%m-%d %H:%M:%S')})")
     log_message(f"Sending log saved to: {LOG_FILE_PATH}")
     log_message(f"Failed emails log saved to: {FAILED_EMAILS_LOG_PATH}")
@@ -222,87 +223,87 @@ if st.session_state.awaiting_confirmation:
             if not st.session_state.contacts:
                 log_message("Error: No contacts found at time of sending. Skipping send.", is_error=True)
                 st.error("No contacts found. Please re-upload your file.")
-                # We can just return here as the button has been clicked and state reset
-                # The rest of the script for this rerun will complete, then a new run will happen
-                # as a result of the state change.
-                return
-
-            with st.spinner("Sending emails... Please do not close this tab."):
-                progress_text_placeholder = st.empty()
+                # Removed the 'return' here to fix the SyntaxError.
+                # The script will continue to the end of this run, and the rerun will handle the new state.
+            else: # Added else block to ensure sending logic only runs if contacts exist
+                total_success = 0
+                total_failed = 0
                 
-                for i, contact in enumerate(st.session_state.contacts):
-                    current_user_prompt = st.session_state.user_prompt_for_send
-                    is_personalized = st.session_state.personalized_mode_for_send
-
-                    contact_name = contact.get("Name", f"Contact {i+1}")
-                    contact_email = contact.get("Email", '').strip()
+                with st.spinner("Sending emails... Please do not close this tab."):
+                    progress_text_placeholder = st.empty()
                     
-                    progress_text_placeholder.text(f"Sending to {contact_name} ({i+1}/{num_contacts})...")
+                    for i, contact in enumerate(st.session_state.contacts):
+                        current_user_prompt = st.session_state.user_prompt_for_send
+                        is_personalized = st.session_state.personalized_mode_for_send
 
-                    if not contact_email or "@" not in contact_email:
-                        log_message(f"Skipping contact {contact_name} due to invalid/missing email: {contact_email}", is_error=True)
-                        st.warning(f"Skipping {contact_name}: Invalid email format.")
-                        total_failed += 1
-                        _log_failed_email_to_file(contact_email, "(N/A)", "(N/A)", f"Invalid/missing email format: {contact_email}") # Log to failed
-                        continue
+                        contact_name = contact.get("Name", f"Contact {i+1}")
+                        contact_email = contact.get("Email", '').strip()
+                        
+                        progress_text_placeholder.text(f"Sending to {contact_name} ({i+1}/{num_contacts})...")
 
-                    email_subject = st.session_state.email_subject_preview
-                    email_body = st.session_state.email_body_preview
-
-                    if is_personalized:
-                        log_message(f"Generating personalized email for {contact_name}...")
-                        try:
-                            personalized_data = st.session_state.agent.generate_email_preview(current_user_prompt, contact)
-                            email_subject = personalized_data.get('email_subject', email_subject)
-                            email_body = personalized_data.get('email_body', email_body)
-                            
-                            if personalized_data.get('raw_llm_output') and "LLM did not return valid JSON" in personalized_data['raw_llm_output']:
-                                log_message(f"Warning: LLM output for {contact_name} was not perfectly parsed.", is_error=True)
-                            log_message(f"Personalized email generated for {contact_name}.")
-                        except Exception as e:
-                            log_message(f"Error generating personalized email for {contact_name}: {e}. Using template fallback.", is_error=True)
-                            st.error(f"Failed to personalize for {contact_name}. See logs.")
+                        if not contact_email or "@" not in contact_email:
+                            log_message(f"Skipping contact {contact_name} due to invalid/missing email: {contact_email}", is_error=True)
+                            st.warning(f"Skipping {contact_name}: Invalid email format.")
                             total_failed += 1
-                            _log_failed_email_to_file(contact_email, email_subject, email_body, f"AI personalization failed: {e}")
+                            _log_failed_email_to_file(contact_email, "(N/A)", "(N/A)", f"Invalid/missing email format: {contact_email}")
                             continue
-                    
-                    log_message(f"Attempting to send email to {contact_name} ({contact_email})...")
-                    email_result = send_email_message(to_email=contact_email, subject=email_subject, body=email_body)
 
-                    if email_result["status"] == "success":
-                        total_success += 1
-                        log_message(f"Email sent successfully to {contact_name}.", is_error=False)
-                    else:
-                        total_failed += 1
-                        log_message(f"Failed to send email to {contact_name}: {email_result['message']}", is_error=True)
-                        # send_email_message already calls _log_failed_email_to_file internally if it fails
+                        email_subject = st.session_state.email_subject_preview
+                        email_body = st.session_state.email_body_preview
 
-            progress_text_placeholder.empty()
+                        if is_personalized:
+                            log_message(f"Generating personalized email for {contact_name}...")
+                            try:
+                                personalized_data = st.session_state.agent.generate_email_preview(current_user_prompt, contact)
+                                email_subject = personalized_data.get('email_subject', email_subject)
+                                email_body = personalized_data.get('email_body', email_body)
+                                
+                                if personalized_data.get('raw_llm_output') and "LLM did not return valid JSON" in personalized_data['raw_llm_output']:
+                                    log_message(f"Warning: LLM output for {contact_name} was not perfectly parsed.", is_error=True)
+                                log_message(f"Personalized email generated for {contact_name}.")
+                            except Exception as e:
+                                log_message(f"Error generating personalized email for {contact_name}: {e}. Using template fallback.", is_error=True)
+                                st.error(f"Failed to personalize for {contact_name}. See logs.")
+                                total_failed += 1
+                                _log_failed_email_to_file(contact_email, email_subject, email_body, f"AI personalization failed: {e}")
+                                continue
+                        
+                        log_message(f"Attempting to send email to {contact_name} ({contact_email})...")
+                        email_result = send_email_message(to_email=contact_email, subject=email_subject, body=email_body)
 
-            st.subheader("--- Sending Complete ---")
-            st.success(f"Successfully sent {total_success} emails.")
-            if total_failed > 0:
-                st.error(f"Failed or Skipped {total_failed} emails. Check the Activity Log and 'failed_emails_log.txt' for details.")
-            else:
-                st.info("All emails sent successfully!")
+                        if email_result["status"] == "success":
+                            total_success += 1
+                            log_message(f"Email sent successfully to {contact_name}.", is_error=False)
+                        else:
+                            total_failed += 1
+                            log_message(f"Failed to send email to {contact_name}: {email_result['message']}", is_error=True)
+                                
+                progress_text_placeholder.empty()
 
-            log_message(f"\n--- Sending Complete ---")
-            log_message(f"Total contacts processed: {num_contacts}")
-            log_message(f"Successful emails sent: {total_success}")
-            log_message(f"Failed or Skipped emails: {total_failed}")
-            
-            # Reset relevant session states for a fresh start on the next run
-            st.session_state.email_subject_preview = ""
-            st.session_state.email_body_preview = ""
-            st.session_state.contacts = []
-            st.session_state.prompt_input = ""
-            st.session_state.user_prompt_for_send = ""
-            st.session_state.personalized_mode = False
-            st.session_state.personalized_mode_for_send = False
-            st.session_state.log_messages = [] # Clear displayed logs for a clean app start on refresh
-            
-            st.success("Email sending process completed and UI reset.")
-            st.experimental_rerun()
+                st.subheader("--- Sending Complete ---")
+                st.success(f"Successfully sent {total_success} emails.")
+                if total_failed > 0:
+                    st.error(f"Failed or Skipped {total_failed} emails. Check the Activity Log and 'failed_emails_log.txt' for details.")
+                else:
+                    st.info("All emails sent successfully!")
+
+                log_message(f"\n--- Sending Complete ---")
+                log_message(f"Total contacts processed: {num_contacts}")
+                log_message(f"Successful emails sent: {total_success}")
+                log_message(f"Failed or Skipped emails: {total_failed}")
+                
+                # Reset relevant session states for a fresh start on the next run
+                st.session_state.email_subject_preview = ""
+                st.session_state.email_body_preview = ""
+                st.session_state.contacts = []
+                st.session_state.prompt_input = ""
+                st.session_state.user_prompt_for_send = ""
+                st.session_state.personalized_mode = False
+                st.session_state.personalized_mode_for_send = False
+                st.session_state.log_messages = [] # Clear displayed logs for a clean app start on refresh
+                
+                st.success("Email sending process completed and UI reset.")
+                st.experimental_rerun()
 
 
 # --- Activity Log Display ---
