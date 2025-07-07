@@ -48,6 +48,9 @@ if 'personalized_mode_for_send' not in st.session_state:
     st.session_state.personalized_mode_for_send = False
 if 'app_just_started' not in st.session_state:
     st.session_state.app_just_started = True
+# New state for manual reset button
+if 'show_reset_button' not in st.session_state:
+    st.session_state.show_reset_button = False
 
 # Initialize prompt_input and personalized_mode if they don't exist
 if 'prompt_input' not in st.session_state:
@@ -304,17 +307,15 @@ if st.session_state.awaiting_confirmation:
                 log_message(f"Successful emails sent: {total_success}")
                 log_message(f"Failed or Skipped emails: {total_failed}")
                 
-                # We will NOT call st.rerun() here immediately.
-                # Instead, we will show a button for the user to trigger the reset.
                 st.session_state.show_reset_button = True
 
 
 # --- Manual Reset Button for UI State ---
-# This button only appears after a send operation completes.
 if st.session_state.get('show_reset_button', False):
     if st.button("Start New Email Session"):
         log_message("User clicked 'Start New Email Session'. Resetting UI.")
-        # Perform the reset logic
+        
+        # Perform the reset logic by deleting keys
         if 'email_subject_preview' in st.session_state:
             del st.session_state.email_subject_preview
         if 'email_body_preview' in st.session_state:
@@ -332,9 +333,10 @@ if st.session_state.get('show_reset_button', False):
             del st.session_state.personalized_mode_for_send
         
         st.session_state.log_messages = [] 
-        st.session_state.show_reset_button = False # Hide itself
+        st.session_state.show_reset_button = False
+        st.session_state.app_just_started = True # Reset this flag for new session
         
-        st.rerun() # This rerun now explicitly resets the UI
+        st.rerun()
 
 
 # --- Activity Log Display ---
