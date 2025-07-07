@@ -116,6 +116,7 @@ if uploaded_file is not None:
     log_message(f"Selected file: {uploaded_file.name}")
     
     st.session_state.contacts, st.session_state.contact_issues = load_contacts_from_excel(temp_file_path)
+    log_message(f"DEBUG: Loaded contacts: {st.session_state.contacts}")
     
     try:
         os.remove(temp_file_path)
