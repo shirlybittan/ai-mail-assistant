@@ -74,7 +74,8 @@ def load_contacts_from_excel(file_path):
 
     for index, row in df.iterrows():
         # Get email using the identified column, defaulting to empty string if not found or NaN
-        email = str(row[email_col_name]).strip() if pd.notna(row[email_col_name]) else ''
+        # *** MODIFIED LINE HERE ***
+        email = str(row[email_col_name]).strip().lower().replace(" ", "") if pd.notna(row[email_col_name]) else ''
         
         # Get name using the identified column, defaulting to "Contact X" if not found or NaN
         if name_col_name and pd.notna(row.get(name_col_name)):
@@ -82,9 +83,9 @@ def load_contacts_from_excel(file_path):
         else:
             name = f"Contact {index + 1}" # Fallback if no name column or name is missing
 
-        # Basic email validation: must not be empty and must contain '@'
-        # This is the primary validation done here, more comprehensive checks can be in send_email_message if needed
-        if email and '@' in email:
+        # Basic email validation: must not be empty and must contain '@' and match basic regex pattern
+        # This will catch most obvious invalid formats, but not non-existent addresses
+        if email and re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
             contacts.append({"name": name, "email": email})
         else:
             # Log issues including the name detected, even if it's a fallback "Contact X"
