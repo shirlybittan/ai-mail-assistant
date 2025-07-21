@@ -35,7 +35,7 @@ if 'user_prompt' not in st.session_state:
 if 'user_email_context' not in st.session_state:
     st.session_state.user_email_context = ""
 if 'personalize_emails' not in st.session_state:
-    st.session_state.personalize_emails = True
+    st.session_state.personalize_emails = False
 
 
 st.title("📧 AI Email Assistant")
