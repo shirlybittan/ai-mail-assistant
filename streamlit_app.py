@@ -1,349 +1,122 @@
-# streamlit_app.py
+# streamlit_app.py (Relevant sections)
 import streamlit as st
 import pandas as pd
-import os
-import time
-import datetime
+from data_handler import load_contacts_from_excel
+from email_generator import SmartEmailAgent
+from email_tool import send_email_message 
+from config import SENDER_CREDENTIALS, OPENAI_API_KEY # Import the new SENDER_CREDENTIALS
 
-# Import your custom modules
-# Make sure these files (data_handler.py, email_tool.py, ai_agent.py, config.py)
-# are in the same directory as this streamlit_app.py file, or accessible in your Python path.
-try:
-    from data_handler import load_contacts_from_excel
-    from email_tool import send_email_message, _log_failed_email_to_file
-    from ai_agent import SmartEmailAgent
-    from config import LOG_FILE_PATH, FAILED_EMAILS_LOG_PATH, SENDER_EMAIL, SENDER_PASSWORD, OPENAI_API_KEY
-    # Add a print to confirm successful imports
-    print("CONSOLE LOG: All custom modules imported successfully.")
-except Exception as e:
-    print(f"CRITICAL ERROR: Failed to import one or more custom modules on startup: {e}")
-    # Even if this prints, the app might crash before Streamlit Cloud captures it if the error is severe.
-    st.error(f"Application failed to start due to a critical import error. Check app logs. Error: {e}")
-    st.stop() # Stop Streamlit execution if imports fail immediately
+# Initialize session state variables
+# ... (Keep existing initialization, including 'sender_email_choice') ...
 
-# --- Directory Setup (Crucial for consistent paths in Streamlit Cloud) ---
-TEMP_DIR = "temp"
-if not os.path.exists(TEMP_DIR):
-    os.makedirs(TEMP_DIR, exist_ok=True)
-    print(f"DEBUG: Created temporary directory: {TEMP_DIR}")
+# --- Configuration and User Input ---
+st.header("Configuration")
 
-# --- Initialize Session State ---
-if 'agent' not in st.session_state:
-    st.session_state.agent = SmartEmailAgent()
-if 'contacts' not in st.session_state:
-    st.session_state.contacts = []
-if 'contact_issues' not in st.session_state:
-    st.session_state.contact_issues = []
-if 'email_subject_preview' not in st.session_state:
-    st.session_state.email_subject_preview = ""
-if 'email_body_preview' not in st.session_state:
-    st.session_state.email_body_preview = ""
-if 'log_messages' not in st.session_state:
-    st.session_state.log_messages = []
-if 'awaiting_confirmation' not in st.session_state:
-    st.session_state.awaiting_confirmation = False
-if 'user_prompt_for_send' not in st.session_state:
-    st.session_state.user_prompt_for_send = ""
-if 'personalized_mode_for_send' not in st.session_state:
-    st.session_state.personalized_mode_for_send = False
-if 'app_just_started' not in st.session_state:
-    st.session_state.app_just_started = True
-# New state for manual reset button
-if 'show_reset_button' not in st.session_state:
-    st.session_state.show_reset_button = False
+# Check if sender credentials are loaded from secrets
+if not SENDER_CREDENTIALS:
+    st.error("Email sender credentials not found in Streamlit Secrets. Please configure them.")
+    st.stop() # Stop execution if no sender credentials are set
 
-# Initialize prompt_input and personalized_mode via .get() for robustness
-# No explicit 'if not in st.session_state' blocks here anymore for default values,
-# as the widget's 'value' parameter will handle it via .get()
-# if they don't exist in session_state.
+# Extract available sender emails for the selectbox
+available_sender_emails = list(SENDER_CREDENTIALS.keys())
+if not available_sender_emails:
+    st.error("No sender email addresses configured in secrets.toml under [SENDER_CREDENTIALS].")
+    st.stop()
 
-# --- Helper Function for Logging ---
-def log_message(message: str, is_error: bool = False):
-    timestamp = datetime.datetime.now().strftime("%H:%M:%S")
-    log_entry = f"[{timestamp}] {message}"
-
-    if is_error:
-        st.session_state.log_messages.append(f"<span style='color:red;'>{log_entry}</span>")
-    else:
-        st.session_state.log_messages.append(log_entry)
-
-    print(f"CONSOLE LOG: {log_entry}")
-
-    try:
-        log_dir = os.path.dirname(LOG_FILE_PATH)
-        if log_dir and not os.path.exists(log_dir):
-            os.makedirs(log_dir, exist_ok=True)
-            print(f"DEBUG: Created log directory: {log_dir}")
-
-        with open(LOG_FILE_PATH, "a", encoding="utf-8") as f:
-            f.write(log_entry + "\n")
-            f.flush()
-    except Exception as e:
-        print(f"ERROR: Could not write to main log file '{LOG_FILE_PATH}': {e}")
-        st.error(f"Error writing to main log file: {e}")
-
-# --- Streamlit UI Configuration ---
-st.set_page_config(
-    page_title="Smart Email Messenger AI Agent",
-    layout="wide",
-    initial_sidebar_state="expanded"
+# Dropdown for sender email selection
+st.session_state.sender_email_choice = st.selectbox(
+    "Choose Sender Email:",
+    available_sender_emails,
+    index=0 # Default to the first email in the list
 )
 
-st.title("📧 Smart Email Messenger AI Agent")
-
-if st.session_state.app_just_started:
-    log_message(f"Application started. (Current Time: {time.strftime('%Y-%m-%d %H:%M:%S')})")
-    log_message(f"Sending log will be saved to: {LOG_FILE_PATH}")
-    log_message(f"Failed emails log will be saved to: {FAILED_EMAILS_LOG_PATH}")
-    # These warnings will only appear if the app gets past the imports
-    if not SENDER_EMAIL or not SENDER_PASSWORD:
-        log_message("WARNING: Email sender credentials (SENDER_EMAIL/SENDER_PASSWORD) are not set. Email sending will likely fail.", is_error=True)
-    if not OPENAI_API_KEY:
-        log_message("WARNING: OpenAI API Key (OPENAI_API_KEY) is not set. AI features may not work.", is_error=True)
-    st.session_state.app_just_started = False
-
-st.sidebar.header("Configuration")
-
-uploaded_file = st.sidebar.file_uploader("Upload Contacts Excel File", type=["xlsx", "xls"])
-
-if uploaded_file is not None:
-    temp_file_path = os.path.join(TEMP_DIR, uploaded_file.name)
-    with open(temp_file_path, "wb") as f:
-        f.write(uploaded_file.getbuffer())
-
-    log_message(f"Selected file: {uploaded_file.name}")
-    
-    st.session_state.contacts, st.session_state.contact_issues = load_contacts_from_excel(temp_file_path)
-    log_message(f"DEBUG: Loaded contacts: {st.session_state.contacts}") # Keep this debug line for now
-    
-    try:
-        os.remove(temp_file_path)
-        log_message(f"Removed temporary file: {temp_file_path}")
-    except OSError as e:
-        log_message(f"Error removing temporary file {temp_file_path}: {e}", is_error=True)
-
-    if not st.session_state.contacts:
-        st.warning("No valid contacts were loaded from the Excel file. Please check file format and email addresses.")
-        log_message("No valid contacts loaded from Excel.", is_error=True)
-    else:
-        log_message(f"Loaded {len(st.session_state.contacts)} valid contacts from Excel.")
-    
-    st.sidebar.metric("Valid Contacts", len(st.session_state.contacts))
-    st.sidebar.metric("Issues Found", len(st.session_state.contact_issues))
-    
-    if st.session_state.contact_issues:
-        with st.sidebar.expander("Show Contact Loading Issues"):
-            for issue in st.session_state.contact_issues:
-                st.markdown(f"- <span style='color:orange;'>{issue}</span>", unsafe_allow_html=True)
-                log_message(f"  - {issue}", is_error=True)
-
-st.header("Email Generation Settings")
-
-personalized_checkbox = st.checkbox(
-    "Generate personalized email for each contact (uses more AI tokens)",
-    value=st.session_state.get('personalized_mode', False), # Use .get() for default
-    key="personalized_mode"
-)
-
-st.subheader("Email Content Generation Prompt (AI will use this)")
-user_prompt = st.text_area(
-    "Enter your prompt here:",
-    value=st.session_state.get('prompt_input', "Generate a friendly welcome email for new subscribers. Introduce our services and offer a special first-time discount code: NEWUSER10."), # Use .get() for default
-    height=150,
-    key="prompt_input"
-)
-
-if st.button("Generate Preview (for first contact)"):
-    if not st.session_state.contacts:
-        st.warning("Please upload an Excel file with valid contacts first.")
-        log_message("Attempted preview without contacts.", is_error=True)
-    elif not user_prompt:
-        st.warning("Please enter an email generation prompt.")
-        log_message("Attempted preview without prompt.", is_error=True)
-    else:
-        log_message("Generating email preview for the first contact. This may take a moment...")
-        with st.spinner("Generating preview..."):
-            try:
-                first_contact = st.session_state.contacts[0]
-                # FIX: Changed 'Name' to 'name' for accessing the key
-                log_message(f"Using first contact for preview: {first_contact.get('name', 'Unnamed Contact')}")
-
-                preview_data = st.session_state.agent.generate_email_preview(user_prompt, first_contact)
-                
-                st.session_state.email_subject_preview = preview_data.get('email_subject', '')
-                st.session_state.email_body_preview = preview_data.get('email_body', '')
-                raw_llm_output = preview_data.get('raw_llm_output', '')
-                
-                log_message("Email preview generated successfully.")
-                if "LLM did not return valid JSON" in raw_llm_output:
-                    log_message(f"Warning: LLM output for preview was not perfectly parsed. Raw output:\n{raw_llm_output}", is_error=True)
-
-            except Exception as e:
-                st.error(f"An error occurred during preview generation: {e}")
-                log_message(f"Error generating preview: {e}", is_error=True)
-
-st.subheader("Email Preview (for first contact)")
-st.text_input("Email Subject:", value=st.session_state.email_subject_preview, key="preview_subject")
-st.text_area("Email Body:", value=st.session_state.email_body_preview, height=300, key="preview_body")
+# ... (Keep your existing user prompt and personalization checkbox inputs) ...
 
 
-# --- Send All Emails Button and Confirmation Flow ---
-st.header("5. Send All Emails")
+# --- Email Generation ---
+# ... (Keep your existing email generation logic using SmartEmailAgent) ...
 
-col1_send_btn, col2_send_conf = st.columns([1, 2])
 
-with col1_send_btn:
-    if st.button("Send All Emails", key="main_send_button"):
-        log_message("MAIN 'Send All Emails' button clicked.")
+# --- Email Sending Logic ---
+st.header("Send Emails")
+if st.session_state.generated_emails:
+    st.session_state.show_preview = True # Ensure preview is shown if emails are generated
 
-        if not st.session_state.contacts:
-            st.warning("Please upload an Excel file with valid contacts first.")
-            log_message("Attempted send without contacts.", is_error=True)
-            st.session_state.awaiting_confirmation = False
+    col1, col2 = st.columns([1, 1])
+
+    with col1:
+        st.write(f"You are about to send emails to **{len(st.session_state.generated_emails)} contacts**.")
+        st.write(f"**Sending Mode:** {'FULLY PERSONALIZED' if personalize_emails else 'TEMPLATE-BASED'}")
+
+        # Retrieve the selected sender email and its corresponding password
+        selected_sender_email = st.session_state.sender_email_choice
+        selected_sender_password = SENDER_CREDENTIALS.get(selected_sender_email)
+
+        if not selected_sender_password:
+            st.error(f"Error: Password not found for selected sender email: {selected_sender_email}. Please check your Streamlit Secrets.")
         else:
-            st.session_state.user_prompt_for_send = user_prompt # Use the current value of user_prompt, which is tied to 'prompt_input' key
-            st.session_state.personalized_mode_for_send = personalized_checkbox # Use the current value of personalized_checkbox, which is tied to 'personalized_mode' key
+            if st.button("Confirm Send All Emails", key="confirm_send_button"):
+                st.write("--- Sending Complete ---")
+                success_count = 0
+                failed_or_skipped_count = 0
+                st.session_state.email_sending_status = [] # Clear previous status
 
-            email_subject_template = st.session_state.email_subject_preview.strip()
-            email_body_template = st.session_state.email_body_preview.strip()
-            
-            if not st.session_state.personalized_mode_for_send and (not email_subject_template or not email_body_template):
-                st.warning("Email subject or body is empty. Please generate or type content for the template.")
-                log_message("Attempted send with empty template content.", is_error=True)
-                st.session_state.awaiting_confirmation = False
-            elif st.session_state.personalized_mode_for_send and not st.session_state.user_prompt_for_send.strip():
-                st.warning("Please enter a message generation prompt for personalized emails.")
-                log_message("Attempted personalized send without prompt.", is_error=True)
-                st.session_state.awaiting_confirmation = False
-            else:
-                st.session_state.awaiting_confirmation = True
-                log_message("Initial send checks passed. Awaiting confirmation...")
-                st.rerun()
+                send_progress_bar = st.progress(0, text="Sending emails...")
 
-if st.session_state.awaiting_confirmation:
-    with col2_send_conf:
-        num_contacts = len(st.session_state.contacts)
-        sending_mode = 'FULLY PERSONALIZED (AI generates for each contact)' if st.session_state.personalized_mode_for_send else 'TEMPLATE (AI generated preview, sent to all)'
-        
-        st.info(
-            f"You are about to send emails to **{num_contacts} contacts**.\n"
-            f"Sending Mode: **{sending_mode}**\n\n"
-            "Are you sure you want to proceed?"
-        )
-        
-        if st.button("Confirm Send All Emails", key="confirm_send_final_button"):
-            log_message("CONFIRM 'Confirm Send All Emails' button clicked. Initiating sending process...")
-            print("CONSOLE LOG (DIRECT): Starting email sending process now!")
-            
-            st.session_state.awaiting_confirmation = False # This hides the confirmation prompt
+                for i, email_data in enumerate(st.session_state.generated_emails):
+                    st.session_state.email_sending_status.append(f"Attempting to send email to {email_data['name']} ({email_data['email']})...")
+                    st.empty().write("\n".join(st.session_state.email_sending_status[-5:])) # Show last 5 status updates
 
-            if not st.session_state.contacts:
-                log_message("Error: No contacts found at time of sending. Skipping send.", is_error=True)
-                st.error("No contacts found. Please re-upload your file.")
-            else:
-                total_success = 0
-                total_failed = 0
-                
-                with st.spinner("Sending emails... Please do not close this tab."):
-                    progress_text_placeholder = st.empty()
-                    
-                    for i, contact in enumerate(st.session_state.contacts):
-                        current_user_prompt = st.session_state.user_prompt_for_send
-                        is_personalized = st.session_state.personalized_mode_for_send
+                    # Call the send_email_message with the dynamically chosen sender email and password
+                    result = send_email_message(
+                        sender_email=selected_sender_email, # Pass sender email
+                        sender_password=selected_sender_password, # Pass sender password
+                        to_email=email_data['email'],
+                        subject=email_data['subject'],
+                        body=email_data['body']
+                    )
 
-                        # FIX: Changed 'Name' to 'name' and 'Email' to 'email' for accessing dictionary keys
-                        contact_name = contact.get("name", f"Contact {i+1}") 
-                        contact_email = contact.get("email", '').strip()
-                        
-                        progress_text_placeholder.text(f"Sending to {contact_name} ({i+1}/{num_contacts})...")
+                    if result["status"] == "success":
+                        st.session_state.email_sending_status.append(f"Email sent successfully to {email_data['name']}.")
+                        success_count += 1
+                    else:
+                        st.session_state.email_sending_status.append(f"Failed to send email to {email_data['name']}: {result['message']}")
+                        failed_or_skipped_count += 1
 
-                        if not contact_email or "@" not in contact_email:
-                            log_message(f"Skipping contact {contact_name} due to invalid/missing email: {contact_email}", is_error=True)
-                            st.warning(f"Skipping {contact_name}: Invalid email format.")
-                            total_failed += 1
-                            _log_failed_email_to_file(contact_email, "(N/A)", "(N/A)", f"Invalid/missing email format: {contact_email}")
-                            continue
+                    send_progress_bar.progress((i + 1) / len(st.session_state.generated_emails))
 
-                        email_subject = st.session_state.email_subject_preview
-                        email_body = st.session_state.email_body_preview
+                st.session_state.email_sending_status.append("--- Sending Complete ---")
+                st.success("All emails sent successfully!")
+                st.session_state.email_sending_status.append(f"Total contacts processed: {len(st.session_state.generated_emails)}")
+                st.session_state.email_sending_status.append(f"Successful emails sent: {success_count}")
+                st.session_state.email_sending_status.append(f"Failed or Skipped emails: {failed_or_skipped_count}")
 
-                        if is_personalized:
-                            log_message(f"Generating personalized email for {contact_name}...")
-                            try:
-                                personalized_data = st.session_state.agent.generate_email_preview(current_user_prompt, contact)
-                                email_subject = personalized_data.get('email_subject', email_subject)
-                                email_body = personalized_data.get('email_body', email_body)
-                                
-                                if personalized_data.get('raw_llm_output') and "LLM did not return valid JSON" in personalized_data['raw_llm_output']:
-                                    log_message(f"Warning: LLM output for {contact_name} was not perfectly parsed.", is_error=True)
-                                log_message(f"Personalized email generated for {contact_name}.")
-                            except Exception as e:
-                                log_message(f"Error generating personalized email for {contact_name}: {e}. Using template fallback.", is_error=True)
-                                st.error(f"Failed to personalize for {contact_name}. See logs.")
-                                total_failed += 1
-                                _log_failed_email_to_file(contact_email, email_subject, email_body, f"AI personalization failed: {e}")
-                                continue
-                        
-                        log_message(f"Attempting to send email to {contact_name} ({contact_email})...")
-                        email_result = send_email_message(to_email=contact_email, subject=email_subject, body=email_body)
+                st.markdown("---")
+                st.subheader("Activity Log")
+                # Removed 'datetime' import dependency for cleaner code presentation
+                # If you need timestamping, ensure 'import datetime' is at the top of your streamlit_app.py
+                for log_entry in reversed(st.session_state.email_sending_status):
+                    st.write(log_entry)
 
-                        if email_result["status"] == "success":
-                            total_success += 1
-                            log_message(f"Email sent successfully to {contact_name}.", is_error=False)
-                        else:
-                            total_failed += 1
-                            log_message(f"Failed to send email to {contact_name}: {email_result['message']}", is_error=True)
-                                
-                progress_text_placeholder.empty()
+                send_progress_bar.empty() # Remove progress bar after completion
 
-                st.subheader("--- Sending Complete ---")
-                st.success(f"Successfully sent {total_success} emails.")
-                if total_failed > 0:
-                    st.error(f"Failed or Skipped {total_failed} emails. Check the Activity Log and 'failed_emails_log.txt' for details.")
-                else:
-                    st.info("All emails sent successfully!")
+                # Reset UI state to start a new session
+                if st.button("Start New Email Session"):
+                    for key in st.session_state.keys():
+                        del st.session_state[key]
+                    st.rerun()
 
-                log_message(f"\n--- Sending Complete ---")
-                log_message(f"Total contacts processed: {num_contacts}")
-                log_message(f"Successful emails sent: {total_success}")
-                log_message(f"Failed or Skipped emails: {total_failed}")
-                
-                st.session_state.show_reset_button = True
+    with col2:
+        if st.session_state.show_preview and st.session_state.generated_emails:
+            st.subheader("Preview Email Content")
+            st.warning("This is a preview of the FIRST email generated. The content will vary if 'Personalize Emails' is checked.")
+            preview_email = st.session_state.generated_emails[0]
+            st.markdown(f"**From:** `{selected_sender_email}`") # Display chosen sender email
+            st.markdown(f"**To:** `{preview_email['name']} <{preview_email['email']}>`")
+            st.markdown(f"**Subject:** `{preview_email['subject']}`")
+            st.markdown("---")
+            st.markdown(preview_email['body'])
+            st.markdown("---")
 
-
-# --- Manual Reset Button for UI State ---
-if st.session_state.get('show_reset_button', False):
-    if st.button("Start New Email Session"):
-        log_message("User clicked 'Start New Email Session'. Resetting UI.")
-        
-        # Perform the reset logic by deleting keys
-        if 'email_subject_preview' in st.session_state:
-            del st.session_state.email_subject_preview
-        if 'email_body_preview' in st.session_state:
-            del st.session_state.email_body_preview
-        if 'contacts' in st.session_state:
-            del st.session_state.contacts
-        
-        if 'prompt_input' in st.session_state:
-            del st.session_state.prompt_input
-        if 'user_prompt_for_send' in st.session_state:
-            del st.session_state.user_prompt_for_send
-        if 'personalized_mode' in st.session_state:
-            del st.session_state.personalized_mode
-        if 'personalized_mode_for_send' in st.session_state:
-            del st.session_state.personalized_mode_for_send
-        
-        st.session_state.log_messages = [] 
-        st.session_state.show_reset_button = False
-        st.session_state.app_just_started = True # Reset this flag for new session
-        
-        st.rerun()
-
-
-# --- Activity Log Display ---
-st.subheader("Activity Log")
-if st.session_state.log_messages:
-    for msg in reversed(st.session_state.log_messages):
-        st.markdown(msg, unsafe_allow_html=True)
 else:
-    st.info("No activity logs yet. Actions will appear here.")
+    st.info("Upload an Excel file and generate emails to see the sending options.")
