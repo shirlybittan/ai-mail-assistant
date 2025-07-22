@@ -49,7 +49,7 @@ TRANSLATIONS = {
 }
 
 # Default language if no session state is set
-DEFAULT_LANG = "fr"
+DEFAULT_LANG = "en"
 
 # Global variable to store the selected language
 _selected_lang = DEFAULT_LANG
