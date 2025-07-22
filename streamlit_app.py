@@ -16,13 +16,13 @@ import datetime
 st.set_page_config(layout="wide", page_title="AI Email Assistant")
 
 # --- DEBUGGING INFO START ---
-st.subheader("Debugging Info (REMOVE AFTER TROUBLESHOOTING)")
-st.write("All secrets from st.secrets:", st.secrets.to_dict()) # This will show the new consolidated structure
-st.write("Sender credentials (from config):", SENDER_CREDENTIALS)
-st.write("OpenAI key (from config):", OPENAI_API_KEY)
-st.write("DEBUG: SENDER_EMAIL:", SENDER_EMAIL) # Added for specific check
-st.write("DEBUG: SENDER_PASSWORD present:", bool(SENDER_PASSWORD)) # Added for specific check
-st.markdown("---")
+#st.subheader("Debugging Info (REMOVE AFTER TROUBLESHOOTING)")
+#st.write("All secrets from st.secrets:", st.secrets.to_dict()) # This will show the new consolidated structure
+#st.write("Sender credentials (from config):", SENDER_CREDENTIALS)
+#st.write("OpenAI key (from config):", OPENAI_API_KEY)
+#st.write("DEBUG: SENDER_EMAIL:", SENDER_EMAIL) # Added for specific check
+#st.write("DEBUG: SENDER_PASSWORD present:", bool(SENDER_PASSWORD)) # Added for specific check
+#st.markdown("---")
 # --- DEBUGGING INFO END ---
 
 
