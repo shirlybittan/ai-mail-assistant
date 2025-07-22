@@ -123,26 +123,6 @@ if st.session_state.page == 'generate':
         st.info(_t("Please upload an Excel file to proceed."))
         st.session_state.contacts = [] # Clear contacts if file is removed
 
-    # Add attachments
-    st.subheader(_t("Add Attachments (Optional)"))
-    st.session_state.uploaded_attachments = st.file_uploader(
-        _t("Upload photos, videos, or documents (recommended total size < 25MB per mail)"),
-        type=[
-            "png", "jpg", "jpeg", "gif",
-            "mp4", "mov", "avi",
-            "pdf",
-            "doc", "docx",
-            "xls", "xlsx",
-            "ppt", "pptx",
-            "txt", "csv", "rtf"
-        ],
-        accept_multiple_files=True,
-        key="attachment_uploader"
-    )
-
-    if st.session_state.uploaded_attachments:
-        st.info(f"{len(st.session_state.uploaded_attachments)}{_t(' file(s) selected for attachment.')}")
-
     # User input for email generation
     st.subheader(_t("Email Content Request"))
     st.session_state.user_prompt = st.text_area(
@@ -162,14 +142,15 @@ if st.session_state.page == 'generate':
         value=st.session_state.personalize_emails
     )
 
-    # New: Generic greeting for non-personalized emails
-    if not st.session_state.personalize_emails:
-        st.session_state.generic_greeting = st.text_input(
-            _t("Optional Generic Greeting for Non-Personalized Emails:"),
-            value=st.session_state.generic_greeting,
-            placeholder=_t("e.g., 'Dear Valued Customer,', 'Hello Team,'")
-        )
-        st.info(_t("Leave empty to use '{{Name}}' placeholder. This field is ignored if 'Personalize each email' is checked."))
+    # Generic greeting for non-personalized emails - now greyed out when personalize is checked
+    generic_greeting_disabled = st.session_state.personalize_emails
+    st.session_state.generic_greeting = st.text_input(
+        _t("Optional Generic Greeting for Non-Personalized Emails:"),
+        value=st.session_state.generic_greeting,
+        placeholder=_t("e.g., 'Dear Valued Customer,', 'Hello Team,'"),
+        disabled=generic_greeting_disabled # Make it greyed out
+    )
+    st.info(_t("This field is ignored if 'Personalize each email' is checked."))
 
 
     st.header(_t("Generate Emails"))
@@ -206,9 +187,19 @@ if st.session_state.page == 'generate':
                 else:
                     st.session_state.template_email = template_output
                     st.success(f"{_t('Generated ')}{1}{_t(' template email!')}") # Report 1 template generated
-                    # Set preview content to the raw template
+
+                    # --- Apply generic greeting to template for preview if applicable ---
+                    preview_body = st.session_state.template_email['body']
+                    if st.session_state.generic_greeting:
+                        # Replace {{Name}} in the template body with the generic greeting for preview
+                        preview_body = preview_body.replace('{{Name}}', st.session_state.generic_greeting)
+                    else:
+                        # If no generic greeting, replace {{Name}} with 'Client' or a similar placeholder for better preview context
+                        preview_body = preview_body.replace('{{Name}}', 'Client') # Default placeholder for preview
+
                     st.session_state.editable_preview_subject = st.session_state.template_email['subject']
-                    st.session_state.editable_preview_body = st.session_state.template_email['body']
+                    st.session_state.editable_preview_body = preview_body # Set the modified body for preview
+
                     st.session_state.page = 'preview' # Move to preview page
                     st.rerun()
 
@@ -258,8 +249,9 @@ elif st.session_state.page == 'preview':
         preview_body_initial = first_email['body']
         preview_name_display = first_email['name']
     elif st.session_state.template_email:
+        # For template, the editable_preview_body already contains the applied generic greeting
         preview_subject_initial = st.session_state.template_email['subject']
-        preview_body_initial = st.session_state.template_email['body']
+        preview_body_initial = st.session_state.editable_preview_body # Use the already processed body for preview
         preview_name_display = "Template" # For template mode, show "Template" as name placeholder
 
 
@@ -270,7 +262,10 @@ elif st.session_state.page == 'preview':
 
         # Information about the preview mode (template vs. personalized)
         if not st.session_state.personalize_emails:
-            st.info(_t("This email is a template. The '{{Name}}' placeholder will be replaced with each contact's name."))
+            if not st.session_state.generic_greeting: # If no generic greeting was provided
+                st.info(_t("This email is a template. The '{{Name}}' placeholder will be replaced with each contact's name."))
+            else: # If generic greeting was provided
+                st.info(f"{_t('This email is a template. The greeting has been set to:')} **{st.session_state.generic_greeting}**")
         st.warning(_t("This is a preview of the FIRST email generated. The content will vary if 'Personalize Emails' is checked."))
 
         # Preview Mode Toggle
@@ -295,10 +290,31 @@ elif st.session_state.page == 'preview':
 
         st.markdown("---") # Separator before send button
 
+        # --- Add attachments on preview page ---
+        st.subheader(_t("Add Attachments (Optional)"))
+        st.session_state.uploaded_attachments = st.file_uploader(
+            _t("Upload photos, videos, or documents (recommended total size < 25MB per mail)"),
+            type=[
+                "png", "jpg", "jpeg", "gif",
+                "mp4", "mov", "avi",
+                "pdf",
+                "doc", "docx",
+                "xls", "xlsx",
+                "ppt", "pptx",
+                "txt", "csv", "rtf"
+            ],
+            accept_multiple_files=True,
+            key="attachment_uploader_preview_page" # Changed key to be unique on this page
+        )
+
+        if st.session_state.uploaded_attachments:
+            st.info(f"{len(st.session_state.uploaded_attachments)}{_t(' file(s) selected for attachment.')}")
+        st.markdown("---") # Separator after attachments
+
         # --- Send All Emails Section ---
         st.subheader(_t("Send Emails"))
         st.write(f"{_t('You are about to send emails to')} **{len(st.session_state.contacts)}**{_t(' contacts.')}")
-        st.write(f"**{_t('Sending Mode:')}** {'**' + _t('FULLY PERSONALIZED') + '**' if st.session_state.personalize_emails else '**' + _t('TEMPLATE-BASED') + '**'}")
+        st.write(f"**{_t('Sending Mode:')}** {'**' + _t('FULLY PERSONALIZED') + '**' if st.session_state.personalize_emails else '**' + _t('BASÉ SUR UN MODÈLE') + '**'}")
 
 
         if not selected_sender_password: # Use selected_sender_password from global scope
@@ -311,30 +327,17 @@ elif st.session_state.page == 'preview':
                 final_emails_to_send = []
                 if not st.session_state.personalize_emails:
                     # Build the full list of emails for sending based on the edited template
-                    # and apply generic greeting if provided, otherwise {{Name}}
                     for contact in st.session_state.contacts:
-                        body_to_use = st.session_state.editable_preview_body
-                        if st.session_state.generic_greeting:
-                            # Replace the entire greeting part (e.g., Dear {{Name}},) with the generic greeting
-                            # This is a bit simplistic; a more robust regex might be needed for complex greetings
-                            # For now, it assumes the greeting starts the email.
-                            # A safer approach might be to just prepend the generic greeting
-                            # and tell the AI not to generate a greeting if generic is used.
-                            # For simplicity, we'll try to replace {{Name}} if present, or prepend if not.
-                            if '{{Name}}' in body_to_use:
-                                personalized_body_for_sending = body_to_use.replace('{{Name}}', st.session_state.generic_greeting)
-                            else:
-                                # If {{Name}} isn't in body, just prepend the generic greeting (or part of it)
-                                personalized_body_for_sending = f"{st.session_state.generic_greeting}\n\n{body_to_use}"
-                        else:
-                            # Use {{Name}} placeholder if no generic greeting and replace with actual contact name
-                            personalized_body_for_sending = body_to_use.replace('{{Name}}', contact['name'])
+                        body_to_use = st.session_state.editable_preview_body # This already has generic greeting or 'Client'
+                        # Now, for actual sending, we replace 'Client' back with the real name if generic greeting wasn't used
+                        if not st.session_state.generic_greeting:
+                             body_to_use = body_to_use.replace('Client', contact['name']) # Replace the preview placeholder with real name
 
                         final_emails_to_send.append({
                             "name": contact['name'],
                             "email": contact['email'],
                             "subject": st.session_state.editable_preview_subject,
-                            "body": personalized_body_for_sending
+                            "body": body_to_use # Use the body prepared for sending
                         })
                 else:
                     # For personalized mode, take the generated list and apply edits from the preview for the first email

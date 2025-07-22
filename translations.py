@@ -108,9 +108,9 @@ TRANSLATIONS = {
         "en": "e.g., 'Dear Valued Customer,', 'Hello Team,'",
         "fr": "ex: 'Cher Client Estimé,', 'Bonjour l'équipe,'"
     },
-    "Leave empty to use '{{Name}}' placeholder. This field is ignored if 'Personalize each email' is checked.": {
-        "en": "Leave empty to use '{{Name}}' placeholder. This field is ignored if 'Personalize each email' is checked.",
-        "fr": "Laissez vide pour utiliser le marqueur '{{Name}}'. Ce champ est ignoré si 'Personnaliser chaque e-mail' est coché."
+    "This field is ignored if 'Personalize each email' is checked.": { # NEW KEY
+        "en": "This field is ignored if 'Personalize each email' is checked.",
+        "fr": "Ce champ est ignoré si 'Personnaliser chaque e-mail' est coché."
     },
     "Preview Mode:": {"en": "Preview Mode:", "fr": "Mode Aperçu :"},
     "View as rendered HTML": {"en": "View as rendered HTML", "fr": "Voir en tant que HTML rendu"},
