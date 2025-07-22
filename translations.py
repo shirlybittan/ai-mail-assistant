@@ -18,7 +18,8 @@ TRANSLATIONS = {
     "Optional: Provide context about your email style or content preferences...": {"en": "Optional: Provide context about your email style or content preferences (e.g., 'I prefer concise, direct language and a friendly tone.')", "fr": "Optionnel : Fournissez un contexte sur votre style d'e-mail ou vos préférences de contenu (ex: 'Je préfère un langage concis et direct et un ton amical.')"},
     "Personalize each email (uses contact name and makes it unique)": {"en": "Personalize each email (uses contact name and makes it unique)", "fr": "Personnaliser chaque e-mail (utilise le nom du contact et le rend unique)"},
     "Generate Emails": {"en": "Generate Emails", "fr": "Générer les E-mails"},
-    "Generate Emails for Contacts": {"en": "Générer les E-mails pour les Contacts", "fr": "Générer les E-mails pour les Contacts"},
+    # FIXED: The English text was wrong here
+    "Generate Emails for Contacts": {"en": "Generate Emails for Contacts", "fr": "Générer les E-mails pour les Contacts"},
     "Please upload an Excel file with contacts first.": {"en": "Please upload an Excel file with contacts first.", "fr": "Veuillez d'abord télécharger un fichier Excel de contacts."},
     "Please provide a description for the email.": {"en": "Please provide a description for the email.", "fr": "Veuillez fournir une description pour l'e-mail."},
     "OpenAI API Key not found. Cannot generate emails.": {"en": "OpenAI API Key not found. Cannot generate emails.", "fr": "Clé API OpenAI introuvable. Impossible de générer des e-mails."},
@@ -46,7 +47,7 @@ TRANSLATIONS = {
     "--- Sending Complete ---": {"en": "--- Sending Complete ---", "fr": "--- Envoi Terminé ---"},
     "All emails processed!": {"en": "All emails processed!", "fr": "Tous les e-mails traités !"},
     "Total contacts processed:": {"en": "Total contacts processed:", "fr": "Total des contacts traités :"},
-    "Successful emails sent:": {"en": "E-mails envoyés avec succès :", "fr": "E-mails envoyés avec succès :"},
+    "Successful emails sent:": {"en": "Successful emails sent:", "fr": "E-mails envoyés avec succès :"},
     "Failed or Skipped emails:": {"en": "Failed or Skipped emails:", "fr": "E-mails échoués ou ignorés :"},
     "Temporary attachments cleaned up.": {"en": "Temporary attachments cleaned up.", "fr": "Pièces jointes temporaires nettoyées."},
     "ERROR: Could not clean up temporary attachments: ": {"en": "ERROR: Could not clean up temporary attachments: ", "fr": "ERREUR : Impossible de nettoyer les pièces jointes temporaires : "},
@@ -56,7 +57,7 @@ TRANSLATIONS = {
     "This is a preview of the FIRST email generated. The content will vary if 'Personalize Emails' is checked.": {"en": "This is a preview of the FIRST email generated. The content will vary if 'Personalize Emails' is checked.", "fr": "Ceci est un aperçu du PREMIER e-mail généré. Le contenu variera si 'Personnaliser les e-mails' est coché."},
     "From:": {"en": "From:", "fr": "De :"},
     "To:": {"en": "To:", "fr": "À :"},
-    "Subject:": {"en": "Objet :", "fr": "Objet :"},
+    "Subject:": {"en": "Subject:", "fr": "Objet :"},
     "Upload photos, videos, or documents (recommended total size < 25MB per mail)": {"en": "Upload photos, videos, or documents (recommended total size < 25 Mo per e-mail)", "fr": "Téléchargez des photos, vidéos ou documents (taille totale recommandée < 25 Mo par e-mail)"},
     " file(s) selected for attachment.": {"en": " file(s) selected for attachment.", "fr": " fichier(s) sélectionné(s) pour la pièce jointe."},
     "Loaded ": {"en": "Loaded ", "fr": "Chargé "},
@@ -83,6 +84,17 @@ TRANSLATIONS = {
         "en": "e.g., 'I prefer concise, direct language and a friendly tone.'",
         "fr": "ex: 'Je préfère un langage concis et direct et un ton amical.'"
     },
+    "Edit Preview": {"en": "Edit Preview", "fr": "Modifier l'Aperçu"},
+    "Back to Generation": {"en": "Back to Generation", "fr": "Retour à la Génération"},
+    "Email Content Preview & Edit": {"en": "Email Content Preview & Edit", "fr": "Aperçu et Modification du Contenu de l'E-mail"},
+    "Preview for ": {"en": "Preview for ", "fr": "Aperçu pour "},
+    "Proceed to Send Emails": {"en": "Proceed to Send Emails", "fr": "Procéder à l'Envoi des E-mails"},
+    "Please generate emails first.": {"en": "Please generate emails first.", "fr": "Veuillez d'abord générer les e-mails."},
+    "Please generate or load emails to send.": {"en": "Please generate or load emails to send.", "fr": "Veuillez générer ou charger des e-mails à envoyer."},
+    "This email is a template. The '{{Name}}' placeholder will be replaced with each contact's name.": {
+        "en": "This email is a template. The '{{Name}}' placeholder will be replaced with each contact's name.",
+        "fr": "Cet e-mail est un modèle. Le marqueur '{{Name}}' sera remplacé par le nom de chaque contact."
+    }
 }
 
 # Helper function for translations
