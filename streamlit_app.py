@@ -63,7 +63,6 @@ set_language(st.session_state.language)
 
 # --- Language Selector ---
 st.sidebar.title(_t("AI Email Assistant"))
-st.sidebar.image("AI.png", use_column_width=True) # Ensure this path is correct
 selected_language = st.sidebar.selectbox(
     _t("Select your language"),
     options=list(LANGUAGES.keys()),
