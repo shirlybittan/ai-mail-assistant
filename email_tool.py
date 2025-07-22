@@ -9,12 +9,8 @@ import datetime
 import re
 import os # Import os for path manipulation
 
-# The FAILED_EMAILS_LOG_PATH will now be passed as an argument from streamlit_app.py
-# So, remove `from config import FAILED_EMAILS_LOG_PATH` from here
-# and adjust the _log_failed_email_to_file function accordingly.
 
-
-def _log_failed_email_to_file(sender_email, to_email, subject, body, error_message, log_path): # <--- ADD log_path parameter
+def _log_failed_email_to_file(sender_email, to_email, subject, body, error_message, log_path):
     """Logs details of a failed email attempt to a dedicated file."""
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_entry = (
@@ -34,7 +30,7 @@ def _log_failed_email_to_file(sender_email, to_email, subject, body, error_messa
     with open(log_path, "a", encoding="utf-8") as f:
         f.write(log_entry)
 
-def send_email_message(sender_email, sender_password, to_email, subject, body, attachments=None, log_path="failed_emails.log"): # <--- ADD log_path parameter here with a default
+def send_email_message(sender_email, sender_password, to_email, subject, body, attachments=None, log_path="failed_emails.log"):
     """
     Sends an email message with optional attachments using an SMTP server.
 

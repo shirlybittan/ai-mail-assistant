@@ -21,28 +21,28 @@ st.set_page_config(layout="wide", page_title=_t("AI Email Assistant")) # Transla
 
 # Initialize session state for language
 if 'language' not in st.session_state:
-    st.session_state.language = "en" # Default language
+    st.session_state.language = "fr" # <--- Langue par défaut changée en français
 
 # Language selector - placed at the top right
 col_lang_select, _ = st.columns([0.2, 0.8])
 with col_lang_select:
     st.session_state.language = st.selectbox(
-        label="Language", # This label itself is a default Streamlit label, not easily translatable via _t() for the label part itself
+        label="Language", # Le libellé du selectbox lui-même est difficilement traduisible directement
         options=list(LANGUAGES.keys()),
-        format_func=lambda x: LANGUAGES[x], # This displays "English" or "Français"
+        format_func=lambda x: LANGUAGES[x], # Cela affichera "English" ou "Français"
         key="language_selector"
     )
 
-st.title(f"📧 {_t('AI Email Assistant')}") # Updated title with icon and translation
+st.title(f"📧 {_t('AI Email Assistant')}") # Titre mis à jour avec icône et traduction
 
 # --- DEBUGGING INFO START ---
-#st.subheader("Debugging Info (REMOVE AFTER TROUBLESHOOTING)")
-#st.write("All secrets from st.secrets:", st.secrets.to_dict()) # This will show the new consolidated structure
-#st.write("Sender credentials (from config):", SENDER_CREDENTIALS) # This is the constructed dictionary
-#st.write("OpenAI key (from config):", OPENAI_API_KEY)
-#st.write("DEBUG: SENDER_EMAIL retrieved:", SENDER_EMAIL) # Added for specific check
-#st.write("DEBUG: SENDER_PASSWORD present:", bool(SENDER_PASSWORD)) # Added for specific check
-#st.write("DEBUG: FAILED_EMAILS_LOG_PATH:", FAILED_EMAILS_LOG_PATH) # Added for specific check
+#st.subheader(_t("Debugging Info (REMOVE AFTER TROUBLESHOOTING)")) # TRADUIT
+#st.write(f"{_t('All secrets from st.secrets:')}", st.secrets.to_dict()) # TRADUIT
+#st.write(f"{_t('Sender credentials (from config):')}", SENDER_CREDENTIALS) # TRADUIT
+#st.write(f"{_t('OpenAI key (from config):')}", OPENAI_API_KEY) # TRADUIT
+#st.write(f"{_t('DEBUG: SENDER_EMAIL retrieved:')}", SENDER_EMAIL) # TRADUIT
+#st.write(f"{_t('DEBUG: SENDER_PASSWORD present:')}", bool(SENDER_PASSWORD)) # TRADUIT
+#st.write(f"{_t('DEBUG: FAILED_EMAILS_LOG_PATH:')}", FAILED_EMAILS_LOG_PATH) # TRADUIT
 #st.markdown("---")
 # --- DEBUGGING INFO END ---
 
@@ -290,4 +290,4 @@ if st.session_state.generated_emails:
             st.markdown("---")
 
 else:
-    st.info(_t("Upload an Excel file and generate emails to see the sending options."))
+    st.info(_t("Upload an Excel file and generate emails to see the sending options.")) # TRADUIT
