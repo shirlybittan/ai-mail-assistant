@@ -12,91 +12,100 @@ import shutil
 import datetime
 
 # --- IMPORT LANGUAGE HELPER ---
-from translations import LANGUAGES, _t # Import LANGUAGES for selectbox options, and _t for translation
-
+from translations import LANGUAGES, _t
 
 # --- Streamlit Page Configuration ---
 st.set_page_config(layout="wide", page_title=_t("AI Email Assistant"))
 
+# --- Global Variables / Access from config (defined at top scope) ---
+selected_sender_email = SENDER_EMAIL
+selected_sender_password = SENDER_PASSWORD
+
 # --- Session State Initialization ---
+# Ensure language is set BEFORE the selectbox is rendered
 if 'language' not in st.session_state:
     st.session_state.language = "fr" # Default language set to French
 
 if 'page' not in st.session_state:
     st.session_state.page = 'generate' # Initial page
 
-if 'generated_emails' not in st.session_state:
-    st.session_state.generated_emails = []
-if 'email_sending_status' not in st.session_state:
-    st.session_state.email_sending_status = []
-if 'uploaded_attachments' not in st.session_state:
-    st.session_state.uploaded_attachments = []
+# Core data states
 if 'contacts' not in st.session_state:
     st.session_state.contacts = []
 if 'contact_issues' not in st.session_state:
     st.session_state.contact_issues = []
+if 'uploaded_attachments' not in st.session_state:
+    st.session_state.uploaded_attachments = []
+if 'personalize_emails' not in st.session_state:
+    st.session_state.personalize_emails = False
 if 'user_prompt' not in st.session_state:
     st.session_state.user_prompt = ""
 if 'user_email_context' not in st.session_state:
     st.session_state.user_email_context = ""
-if 'personalize_emails' not in st.session_state:
-    st.session_state.personalize_emails = False
-if 'editable_preview_subject' not in st.session_state:
+if 'generic_greeting' not in st.session_state: # New state for generic greeting
+    st.session_state.generic_greeting = ""
+
+
+# States for generated content
+if 'generated_personalized_emails' not in st.session_state: # List of fully personalized emails (if mode is personalized)
+    st.session_state.generated_personalized_emails = []
+if 'template_email' not in st.session_state: # Single template email (if mode is template-based)
+    st.session_state.template_email = None # Stores {"subject": "...", "body": "..."} with {{Name}}
+if 'editable_preview_subject' not in st.session_state: # Subject as seen/edited in preview
     st.session_state.editable_preview_subject = ""
-if 'editable_preview_body' not in st.session_state:
+if 'editable_preview_body' not in st.session_state: # Body as seen/edited in preview
     st.session_state.editable_preview_body = ""
 
 
-# --- Language Selector (Top Right) ---
+# States for sending process
+if 'email_sending_status' not in st.session_state:
+    st.session_state.email_sending_status = []
+if 'sending_in_progress' not in st.session_state: # Track if sending process is active
+    st.session_state.sending_in_progress = False
+
+
+# --- Header & Language Selector ---
 col_lang_select, _ = st.columns([0.2, 0.8])
 with col_lang_select:
+    # Find the index of "fr" to set it as default
+    default_lang_index = list(LANGUAGES.keys()).index("fr") if "fr" in LANGUAGES else 0
     st.session_state.language = st.selectbox(
         label="Language",
         options=list(LANGUAGES.keys()),
         format_func=lambda x: LANGUAGES[x],
-        key="language_selector"
+        key="language_selector",
+        index=default_lang_index # Set default index
     )
 
 st.title(f"📧 {_t('AI Email Assistant')}")
 
-# --- DEBUGGING INFO (REMOVABLE) ---
-# st.subheader(_t("Debugging Info (REMOVE AFTER TROUBLESHOOTING)"))
-# st.write(f"{_t('All secrets from st.secrets:')}", st.secrets.to_dict())
-# st.write(f"{_t('Sender credentials (from config):')}", SENDER_CREDENTIALS)
-# st.write(f"{_t('OpenAI key (from config):')}", OPENAI_API_KEY)
-# st.write(f"{_t('DEBUG: SENDER_EMAIL retrieved:')}", SENDER_EMAIL)
-# st.write(f"{_t('DEBUG: SENDER_PASSWORD present:')}", bool(SENDER_PASSWORD))
-# st.write(f"{_t('DEBUG: FAILED_EMAILS_LOG_PATH:')}", FAILED_EMAILS_LOG_PATH)
-# st.markdown("---")
 
-
-# --- Navigation Buttons ---
-if st.session_state.page == 'generate':
-    pass # No "Back" button on the first page
-elif st.session_state.page == 'preview':
+# --- Navigation Buttons (Conditional Rendering based on page) ---
+if st.session_state.page == 'preview':
     if st.button(_t("Back to Generation")):
         st.session_state.page = 'generate'
         st.rerun()
-elif st.session_state.page == 'send':
-    if st.button(_t("Back to Generation")): # Back to generation from send page
+elif st.session_state.page == 'sending_log':
+    # This button allows going back to generation from the log page
+    if st.button(_t("Back to Generation")):
         st.session_state.page = 'generate'
         st.rerun()
+    # The "Start New Email Session" button is at the bottom of the sending_log page
 
 
-# --- Page: Email Generation ---
+# --- Page 1: Email Generation (Page 'generate') ---
 if st.session_state.page == 'generate':
     st.header(_t("Configuration"))
 
     # Check if sender credentials and OpenAI API key are loaded from config.py
-    if not SENDER_EMAIL or not SENDER_PASSWORD:
+    if not selected_sender_email or not selected_sender_password:
         st.error(_t("Sender email or password not found. Please configure them correctly in Streamlit Secrets under [app_credentials]."))
         st.stop()
     if not OPENAI_API_KEY:
-        st.error(_t("OpenAI API Key not found. Please configure it correctly in Streamlit Secrets under [app_credentials]."))
+        st.error(_t("OpenAI API Key not found. Cannot generate emails."))
         st.stop()
 
-    st.info(f"{_t('Using sender email:')} **{SENDER_EMAIL}**")
-    selected_sender_email = SENDER_EMAIL # Set the selected email directly
+    st.info(f"{_t('Using sender email:')} **{selected_sender_email}**")
 
 
     # File uploader for contacts list
@@ -153,6 +162,16 @@ if st.session_state.page == 'generate':
         value=st.session_state.personalize_emails
     )
 
+    # New: Generic greeting for non-personalized emails
+    if not st.session_state.personalize_emails:
+        st.session_state.generic_greeting = st.text_input(
+            _t("Optional Generic Greeting for Non-Personalized Emails:"),
+            value=st.session_state.generic_greeting,
+            placeholder=_t("e.g., 'Dear Valued Customer,', 'Hello Team,'")
+        )
+        st.info(_t("Leave empty to use '{{Name}}' placeholder. This field is ignored if 'Personalize each email' is checked."))
+
+
     st.header(_t("Generate Emails"))
 
     if st.button(_t("Generate Emails for Contacts")):
@@ -163,7 +182,8 @@ if st.session_state.page == 'generate':
         elif not OPENAI_API_KEY:
             st.error(_t("OpenAI API Key not found. Cannot generate emails."))
         else:
-            st.session_state.generated_emails = []
+            st.session_state.generated_personalized_emails = [] # Clear previous list
+            st.session_state.template_email = None # Clear previous template
 
             try:
                 agent = SmartEmailAgent(openai_api_key=OPENAI_API_KEY)
@@ -171,13 +191,12 @@ if st.session_state.page == 'generate':
                 st.error(f"{_t('Error initializing AI agent: ')}{e}. {_t('Please check your OpenAI API Key.')}")
                 st.stop()
 
-            # --- OPTIMIZED GENERATION LOGIC ---
             if not st.session_state.personalize_emails:
-                # Generate a single template if not personalizing
+                # Generate a single template (faster for non-personalized)
                 with st.spinner(_t("Generating emails...")):
                     template_output = agent.generate_email(
                         prompt=st.session_state.user_prompt,
-                        personalize=False, # Explicitly generate template
+                        personalize=False, # Explicitly generate template with {{Name}}
                         user_email_context=st.session_state.user_email_context,
                         output_language=st.session_state.language
                     )
@@ -185,17 +204,13 @@ if st.session_state.page == 'generate':
                 if "Error" in template_output["subject"]:
                     st.error(f"{_t('Error generating template email:')} {template_output['body']}")
                 else:
-                    # Apply template to all contacts
-                    for contact in st.session_state.contacts:
-                        # Replace {{Name}} placeholder with actual name
-                        personalized_body = template_output['body'].replace('{{Name}}', contact['name'])
-                        st.session_state.generated_emails.append({
-                            "name": contact['name'],
-                            "email": contact['email'],
-                            "subject": template_output['subject'],
-                            "body": personalized_body
-                        })
-                    st.success(f"{_t('Generated ')}{len(st.session_state.generated_emails)}{_t(' emails!')} ({_t('TEMPLATE-BASED')})")
+                    st.session_state.template_email = template_output
+                    st.success(f"{_t('Generated ')}{1}{_t(' template email!')}") # Report 1 template generated
+                    # Set preview content to the raw template
+                    st.session_state.editable_preview_subject = st.session_state.template_email['subject']
+                    st.session_state.editable_preview_body = st.session_state.template_email['body']
+                    st.session_state.page = 'preview' # Move to preview page
+                    st.rerun()
 
             else:
                 # Generate individually if personalizing
@@ -208,7 +223,7 @@ if st.session_state.page == 'generate':
                         user_email_context=st.session_state.user_email_context,
                         output_language=st.session_state.language
                     )
-                    st.session_state.generated_emails.append({
+                    st.session_state.generated_personalized_emails.append({
                         "name": contact['name'],
                         "email": contact['email'],
                         "subject": email_output['subject'],
@@ -217,174 +232,246 @@ if st.session_state.page == 'generate':
                     generation_progress_bar.progress((i + 1) / len(st.session_state.contacts), text=f"{_t('Generating email for ')}{contact['name']}...")
 
                 generation_progress_bar.empty()
-                st.success(f"{_t('Generated ')}{len(st.session_state.generated_emails)}{_t(' emails!')} ({_t('FULLY PERSONALIZED')})")
+                st.success(f"{_t('Generated ')}{len(st.session_state.generated_personalized_emails)}{_t(' emails!')} ({_t('FULLY PERSONALIZED')})")
 
-            # After generation, move to preview page
-            if st.session_state.generated_emails:
-                first_email = st.session_state.generated_emails[0]
-                st.session_state.editable_preview_subject = first_email['subject']
-                st.session_state.editable_preview_body = first_email['body']
-                st.session_state.page = 'preview'
-                st.rerun()
+                if st.session_state.generated_personalized_emails:
+                    # Set preview content to the first fully personalized email
+                    first_email = st.session_state.generated_personalized_emails[0]
+                    st.session_state.editable_preview_subject = first_email['subject']
+                    st.session_state.editable_preview_body = first_email['body']
+                    st.session_state.page = 'preview' # Move to preview page
+                    st.rerun()
 
 
-# --- Page: Email Preview & Edit ---
+# --- Page 2: Email Content Preview & Send (Page 'preview') ---
 elif st.session_state.page == 'preview':
-    st.header(_t("Email Content Preview & Edit"))
+    st.header(_t("Email Content Preview & Send"))
 
-    if not st.session_state.generated_emails:
+    # Determine which content to display for preview
+    preview_subject_initial = ""
+    preview_body_initial = ""
+    preview_name_display = "" # Name for the "Preview for" label
+
+    if st.session_state.personalize_emails and st.session_state.generated_personalized_emails:
+        first_email = st.session_state.generated_personalized_emails[0]
+        preview_subject_initial = first_email['subject']
+        preview_body_initial = first_email['body']
+        preview_name_display = first_email['name']
+    elif st.session_state.template_email:
+        preview_subject_initial = st.session_state.template_email['subject']
+        preview_body_initial = st.session_state.template_email['body']
+        preview_name_display = "Template" # For template mode, show "Template" as name placeholder
+
+
+    if not (st.session_state.generated_personalized_emails or st.session_state.template_email):
         st.warning(_t("Please generate emails first."))
-        if st.button(_t("Back to Generation")):
-            st.session_state.page = 'generate'
-            st.rerun()
     else:
-        # Display editable subject and body
-        st.subheader(f"{_t('Preview for ')}{st.session_state.generated_emails[0]['name']}")
+        st.subheader(f"{_t('Preview for ')}{preview_name_display}")
+
+        # Information about the preview mode (template vs. personalized)
         if not st.session_state.personalize_emails:
             st.info(_t("This email is a template. The '{{Name}}' placeholder will be replaced with each contact's name."))
         st.warning(_t("This is a preview of the FIRST email generated. The content will vary if 'Personalize Emails' is checked."))
 
-        edited_subject = st.text_input(_t("Subject:"), value=st.session_state.editable_preview_subject)
-        edited_body = st.text_area(_t("Email Body:"), value=st.session_state.editable_preview_body, height=400)
+        # Preview Mode Toggle
+        col_view_mode, _ = st.columns([0.2, 0.8])
+        with col_view_mode:
+            preview_as_html = st.checkbox(_t("View as rendered HTML"), value=False, key="preview_html_toggle")
 
-        # Update session state with edited content
-        st.session_state.editable_preview_subject = edited_subject
-        st.session_state.editable_preview_body = edited_body
+        # Display editable subject and body
+        st.session_state.editable_preview_subject = st.text_input(
+            _t("Subject:"), value=st.session_state.editable_preview_subject or preview_subject_initial,
+            key="editable_subject"
+        )
 
-        if st.button(_t("Proceed to Send Emails")):
-            # If template-based, apply edits to all generated emails
-            if not st.session_state.personalize_emails:
-                for email_data in st.session_state.generated_emails:
-                    email_data['subject'] = edited_subject
-                    # Re-apply placeholder substitution in case body was edited
-                    email_data['body'] = edited_body.replace('{{Name}}', email_data['name'])
-            else:
-                # If personalized, the user edits the first email, but for sending,
-                # we'd typically use the *originally* generated personalized emails.
-                # If the user edits, this implies they want the first email to be this edited version,
-                # and if they proceed, the others remain as originally personalized.
-                # For simplicity here, if personalized, only the first one is shown/edited.
-                # If you want to apply edits to *all* personalized emails, it would require
-                # re-generating or re-applying changes based on a diff, which is complex.
-                # For now, we'll assume the edit is primarily for the first preview,
-                # and send uses the original if not template-based.
-                # Let's re-evaluate if the user edits a personalized email and wants that specific edit for all.
-                # For now, to keep it simple, if `personalize_emails` is True, this edit applies only to the first email in the list.
-                # If this is not desired, we'd need to deep copy and apply edits selectively.
-                # To be consistent with "preview of the first email", let's update the first email's content.
-                if st.session_state.generated_emails:
-                    st.session_state.generated_emails[0]['subject'] = edited_subject
-                    st.session_state.generated_emails[0]['body'] = edited_body
+        st.markdown(f"**{_t('Email Body:')}**")
+        if preview_as_html:
+            st.components.v1.html(st.session_state.editable_preview_body or preview_body_initial, height=400, scrolling=True)
+        else:
+            st.session_state.editable_preview_body = st.text_area(
+                "", value=st.session_state.editable_preview_body or preview_body_initial, height=400,
+                key="editable_body"
+            )
 
+        st.markdown("---") # Separator before send button
 
-            st.session_state.page = 'send'
-            st.rerun()
-
-
-# --- Page: Email Sending ---
-elif st.session_state.page == 'send':
-    st.header(_t("Send Emails"))
-
-    if not st.session_state.generated_emails:
-        st.warning(_t("Please generate or load emails to send."))
-        if st.button(_t("Back to Generation")):
-            st.session_state.page = 'generate'
-            st.rerun()
-    else:
-        st.write(f"{_t('You are about to send emails to')} **{len(st.session_state.generated_emails)}**{_t(' contacts.')}")
+        # --- Send All Emails Section ---
+        st.subheader(_t("Send Emails"))
+        st.write(f"{_t('You are about to send emails to')} **{len(st.session_state.contacts)}**{_t(' contacts.')}")
         st.write(f"**{_t('Sending Mode:')}** {'**' + _t('FULLY PERSONALIZED') + '**' if st.session_state.personalize_emails else '**' + _t('TEMPLATE-BASED') + '**'}")
 
-        selected_sender_password = SENDER_PASSWORD
 
-        if not selected_sender_password:
-            st.error(f"{_t('Error: Password not found for sender email:')} `{SENDER_EMAIL}`. {_t('Please check your Streamlit Secrets.')}")
+        if not selected_sender_password: # Use selected_sender_password from global scope
+            st.error(f"{_t('Error: Password not found for sender email:')} `{selected_sender_email}`. {_t('Please check your Streamlit Secrets.')}")
         else:
             if st.button(_t("Confirm Send All Emails"), key="confirm_send_button"):
-                st.write(_t("--- Sending Emails ---"))
-                success_count = 0
-                failed_or_skipped_count = 0
-                st.session_state.email_sending_status = []
+                st.session_state.email_sending_status = [] # Clear previous status log
+                st.session_state.sending_in_progress = True # Indicate sending has started
 
-                send_progress_bar = st.progress(0, text=_t("Sending emails..."))
-
-                temp_dir = None
-                attachment_paths = []
-
-                if st.session_state.uploaded_attachments:
-                    try:
-                        temp_dir = tempfile.mkdtemp()
-                        st.session_state.email_sending_status.append(f"{_t('Preparing ')}{len(st.session_state.uploaded_attachments)}{_t(' attachment(s)...')}")
-
-                        for uploaded_file in st.session_state.uploaded_attachments:
-                            file_path = os.path.join(temp_dir, uploaded_file.name)
-                            with open(file_path, "wb") as f:
-                                f.write(uploaded_file.getbuffer())
-                            attachment_paths.append(file_path)
-                        st.session_state.email_sending_status.append(_t("Attachments prepared."))
-                        print(f"CONSOLE LOG: streamlit_app.py: Attachments saved to temporary directory: {temp_dir}")
-                    except Exception as e:
-                        st.session_state.email_sending_status.append(f"{_t('ERROR: Could not prepare attachments: ')}{e}")
-                        st.error(f"{_t('Could not prepare attachments: ')}{e}. {_t('Email sending aborted.')}")
-                        send_progress_bar.empty()
-                        if temp_dir and os.path.exists(temp_dir):
-                            try: shutil.rmtree(temp_dir)
-                            except Exception as cleanup_e: print(f"Cleanup error: {cleanup_e}")
-                        st.stop()
-
-                try:
-                    for i, email_data in enumerate(st.session_state.generated_emails):
-                        st.session_state.email_sending_status.append(f"{_t('Attempting to send email to ')}{email_data['name']} ({email_data['email']})...")
-                        # Displaying only the last 5 status updates to keep the UI clean
-                        st.empty().write("\n".join(st.session_state.email_sending_status[-5:]))
-
-                        result = send_email_message(
-                            sender_email=selected_sender_email,
-                            sender_password=selected_sender_password,
-                            to_email=email_data['email'],
-                            subject=email_data['subject'],
-                            body=email_data['body'],
-                            attachments=attachment_paths,
-                            log_path=FAILED_EMAILS_LOG_PATH # Pass the log path
-                        )
-
-                        if result["status"] == "success":
-                            st.session_state.email_sending_status.append(f"{_t('Email sent successfully to ')}{email_data['name']}.")
-                            success_count += 1
+                final_emails_to_send = []
+                if not st.session_state.personalize_emails:
+                    # Build the full list of emails for sending based on the edited template
+                    # and apply generic greeting if provided, otherwise {{Name}}
+                    for contact in st.session_state.contacts:
+                        body_to_use = st.session_state.editable_preview_body
+                        if st.session_state.generic_greeting:
+                            # Replace the entire greeting part (e.g., Dear {{Name}},) with the generic greeting
+                            # This is a bit simplistic; a more robust regex might be needed for complex greetings
+                            # For now, it assumes the greeting starts the email.
+                            # A safer approach might be to just prepend the generic greeting
+                            # and tell the AI not to generate a greeting if generic is used.
+                            # For simplicity, we'll try to replace {{Name}} if present, or prepend if not.
+                            if '{{Name}}' in body_to_use:
+                                personalized_body_for_sending = body_to_use.replace('{{Name}}', st.session_state.generic_greeting)
+                            else:
+                                # If {{Name}} isn't in body, just prepend the generic greeting (or part of it)
+                                personalized_body_for_sending = f"{st.session_state.generic_greeting}\n\n{body_to_use}"
                         else:
-                            st.session_state.email_sending_status.append(f"{_t('Failed to send email to ')}{email_data['name']}: {result['message']}")
-                            failed_or_skipped_count += 1
+                            # Use {{Name}} placeholder if no generic greeting and replace with actual contact name
+                            personalized_body_for_sending = body_to_use.replace('{{Name}}', contact['name'])
 
-                        send_progress_bar.progress((i + 1) / len(st.session_state.generated_emails))
+                        final_emails_to_send.append({
+                            "name": contact['name'],
+                            "email": contact['email'],
+                            "subject": st.session_state.editable_preview_subject,
+                            "body": personalized_body_for_sending
+                        })
+                else:
+                    # For personalized mode, take the generated list and apply edits from the preview for the first email
+                    final_emails_to_send = st.session_state.generated_personalized_emails[:] # Make a copy
+                    if final_emails_to_send: # Ensure there's at least one email
+                        final_emails_to_send[0]['subject'] = st.session_state.editable_preview_subject
+                        final_emails_to_send[0]['body'] = st.session_state.editable_preview_body
 
-                    st.session_state.email_sending_status.append(_t("--- Sending Complete ---"))
-                    st.success(_t("All emails processed!"))
-                    st.session_state.email_sending_status.append(f"{_t('Total contacts processed:')} {len(st.session_state.generated_emails)}")
-                    st.session_state.email_sending_status.append(f"{_t('Successful emails sent:')} {success_count}")
-                    st.session_state.email_sending_status.append(f"{_t('Failed or Skipped emails:')} {failed_or_skipped_count}")
+                if not final_emails_to_send:
+                    st.error(_t("No emails to send. Please ensure contacts are loaded and emails generated."))
+                    st.session_state.sending_in_progress = False # Reset sending flag
+                    st.stop() # Stop execution if nothing to send
 
-                finally:
+                # Store the final list of emails to be sent in session state
+                st.session_state.final_emails_to_send = final_emails_to_send
+
+                # Switch to the sending_log page and trigger rerun
+                st.session_state.page = 'sending_log'
+                st.session_state.email_sending_status.append(_t("--- Sending Emails ---"))
+                st.session_state.email_sending_status.append(f"{_t('You are about to send emails to')} {len(st.session_state.final_emails_to_send)} {_t('contacts.')}")
+                st.rerun()
+
+
+# --- Page 3: Sending Activity Log (Page 'sending_log') ---
+elif st.session_state.page == 'sending_log':
+    st.header(_t("Sending Activity Log"))
+
+    # Only run the sending logic once when entering this page
+    if st.session_state.sending_in_progress:
+        success_count = 0
+        failed_or_skipped_count = 0
+
+        # Retrieve the emails to send from session state
+        final_emails_to_send = st.session_state.final_emails_to_send
+
+        if not final_emails_to_send:
+            st.error(_t("No emails found to send. This shouldn't happen."))
+            st.session_state.sending_in_progress = False
+        else:
+            send_progress_bar = st.progress(0, text=_t("Sending emails..."))
+
+            temp_dir = None
+            attachment_paths = []
+
+            if st.session_state.uploaded_attachments:
+                try:
+                    temp_dir = tempfile.mkdtemp()
+                    st.session_state.email_sending_status.append(f"{_t('Preparing ')}{len(st.session_state.uploaded_attachments)}{_t(' attachment(s)...')}")
+                    st.empty().write("\n".join(st.session_state.email_sending_status)) # Update log in real-time
+
+                    for uploaded_file in st.session_state.uploaded_attachments:
+                        file_path = os.path.join(temp_dir, uploaded_file.name)
+                        with open(file_path, "wb") as f:
+                            f.write(uploaded_file.getbuffer())
+                        attachment_paths.append(file_path)
+                    st.session_state.email_sending_status.append(_t("Attachments prepared."))
+                    st.empty().write("\n".join(st.session_state.email_sending_status)) # Update log in real-time
+                    print(f"CONSOLE LOG: streamlit_app.py: Attachments saved to temporary directory: {temp_dir}")
+                except Exception as e:
+                    st.session_state.email_sending_status.append(f"{_t('ERROR: Could not prepare attachments: ')}{e}")
+                    st.error(f"{_t('Could not prepare attachments: ')}{e}. {_t('Email sending aborted.')}")
                     send_progress_bar.empty()
                     if temp_dir and os.path.exists(temp_dir):
-                        try:
-                            shutil.rmtree(temp_dir)
-                            st.session_state.email_sending_status.append(_t("Temporary attachments cleaned up."))
-                            print(f"CONSOLE LOG: streamlit_app.py: Cleaned up temporary directory: {temp_dir}")
-                        except Exception as cleanup_e:
-                            st.session_state.email_sending_status.append(f"{_t('ERROR: Could not clean up temporary attachments: ')}{cleanup_e}")
-                            print(f"ERROR: streamlit_app.py: Could not clean up temporary directory {temp_dir}: {cleanup_e}")
+                        try: shutil.rmtree(temp_dir)
+                        except Exception as cleanup_e: print(f"Cleanup error: {cleanup_e}")
+                    st.session_state.sending_in_progress = False
+                    # Update status log in UI
+                    st.empty().write("\n".join(st.session_state.email_sending_status))
+                    # st.stop() # Removed st.stop() to allow displaying final log
 
-                st.markdown("---")
-                st.subheader(_t("Activity Log"))
-                for log_entry in reversed(st.session_state.email_sending_status):
-                    st.write(log_entry)
+            try:
+                for i, email_data in enumerate(final_emails_to_send):
+                    status_message = f"{_t('Attempting to send email to ')}{email_data['name']} ({email_data['email']})..."
+                    st.session_state.email_sending_status.append(status_message)
+                    # Displaying only the last few status updates to keep the UI clean
+                    st.empty().write("\n".join(st.session_state.email_sending_status[-5:]))
 
-                if st.button(_t("Start New Email Session")):
-                    # Reset all relevant session state variables
-                    for key in [
-                        'generated_emails', 'email_sending_status', 'uploaded_attachments',
-                        'contacts', 'contact_issues', 'user_prompt', 'user_email_context',
-                        'personalize_emails', 'page', 'editable_preview_subject', 'editable_preview_body'
-                    ]:
-                        if key in st.session_state:
-                            del st.session_state[key]
-                    st.rerun()
+                    result = send_email_message(
+                        sender_email=selected_sender_email,
+                        sender_password=selected_sender_password,
+                        to_email=email_data['email'],
+                        subject=email_data['subject'],
+                        body=email_data['body'],
+                        attachments=attachment_paths,
+                        log_path=FAILED_EMAILS_LOG_PATH
+                    )
+
+                    if result["status"] == "success":
+                        st.session_state.email_sending_status.append(f"{_t('Email sent successfully to ')}{email_data['name']}.")
+                        success_count += 1
+                    else:
+                        st.session_state.email_sending_status.append(f"{_t('Failed to send email to ')}{email_data['name']}: {result['message']}")
+                        failed_or_skipped_count += 1
+
+                    send_progress_bar.progress((i + 1) / len(final_emails_to_send))
+                    st.empty().write("\n".join(st.session_state.email_sending_status[-5:])) # Update log in real-time
+
+                st.session_state.email_sending_status.append(_t("--- Sending Complete ---"))
+                st.success(_t("All emails processed!"))
+                st.session_state.email_sending_status.append(f"{_t('Total contacts processed:')} {len(final_emails_to_send)}")
+                st.session_state.email_sending_status.append(f"{_t('Successful emails sent:')} {success_count}")
+                st.session_state.email_sending_status.append(f"{_t('Failed or Skipped emails:')} {failed_or_skipped_count}")
+
+            finally:
+                send_progress_bar.empty()
+                st.session_state.sending_in_progress = False # Mark sending as complete
+                if temp_dir and os.path.exists(temp_dir):
+                    try:
+                        shutil.rmtree(temp_dir)
+                        st.session_state.email_sending_status.append(_t("Temporary attachments cleaned up."))
+                        print(f"CONSOLE LOG: streamlit_app.py: Cleaned up temporary directory: {temp_dir}")
+                    except Exception as cleanup_e:
+                        st.session_state.email_sending_status.append(f"{_t('ERROR: Could not clean up temporary attachments: ')}{cleanup_e}")
+                        print(f"ERROR: streamlit_app.py: Could not clean up temporary directory {temp_dir}: {cleanup_e}")
+
+                # Final display of the complete log
+                st.empty().write("\n".join(st.session_state.email_sending_status))
+
+
+    # Display the activity log once sending is finished or if it was already finished
+    st.markdown("---")
+    st.subheader(_t("Activity Log"))
+    # Always show the full log at the end
+    for log_entry in reversed(st.session_state.email_sending_status):
+        st.write(log_entry)
+
+    if not st.session_state.sending_in_progress: # Only show 'Start New' button when sending is done
+        if st.button(_t("Start New Email Session")):
+            # Reset all relevant session state variables for a fresh start
+            for key in [
+                'generated_personalized_emails', 'template_email', 'email_sending_status',
+                'uploaded_attachments', 'contacts', 'contact_issues',
+                'user_prompt', 'user_email_context', 'personalize_emails',
+                'editable_preview_subject', 'editable_preview_body', 'sending_in_progress',
+                'generic_greeting', 'final_emails_to_send' # Added new keys to reset
+            ]:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.session_state.page = 'generate' # Go back to the first page
+            st.rerun()

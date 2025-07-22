@@ -18,7 +18,6 @@ TRANSLATIONS = {
     "Optional: Provide context about your email style or content preferences...": {"en": "Optional: Provide context about your email style or content preferences (e.g., 'I prefer concise, direct language and a friendly tone.')", "fr": "Optionnel : Fournissez un contexte sur votre style d'e-mail ou vos préférences de contenu (ex: 'Je préfère un langage concis et direct et un ton amical.')"},
     "Personalize each email (uses contact name and makes it unique)": {"en": "Personalize each email (uses contact name and makes it unique)", "fr": "Personnaliser chaque e-mail (utilise le nom du contact et le rend unique)"},
     "Generate Emails": {"en": "Generate Emails", "fr": "Générer les E-mails"},
-    # FIXED: The English text was wrong here
     "Generate Emails for Contacts": {"en": "Generate Emails for Contacts", "fr": "Générer les E-mails pour les Contacts"},
     "Please upload an Excel file with contacts first.": {"en": "Please upload an Excel file with contacts first.", "fr": "Veuillez d'abord télécharger un fichier Excel de contacts."},
     "Please provide a description for the email.": {"en": "Please provide a description for the email.", "fr": "Veuillez fournir une description pour l'e-mail."},
@@ -54,7 +53,7 @@ TRANSLATIONS = {
     "Activity Log": {"en": "Activity Log", "fr": "Journal d'Activité"},
     "Start New Email Session": {"en": "Start New Email Session", "fr": "Commencer une Nouvelle Session E-mail"},
     "Preview Email Content": {"en": "Preview Email Content", "fr": "Aperçu du Contenu de l'E-mail"},
-    "This is a preview of the FIRST email generated. The content will vary if 'Personalize Emails' is checked.": {"en": "This is a preview of the FIRST email generated. The content will vary if 'Personalize Emails' is checked.", "fr": "Ceci est un aperçu du PREMIER e-mail généré. Le contenu variera si 'Personnaliser les e-mails' est coché."},
+    "This is a preview of the FIRST email generated. The content will vary if 'Personalize Emails' is checked.": {"en": "This is a preview of the FIRST email generated. The content will vary if 'Personalize Emails' is checked.", "fr": "Ceci est un aperçu du PREMIER e-mail généré. Le contenu variera si 'Personaliser les e-mails' est coché."},
     "From:": {"en": "From:", "fr": "De :"},
     "To:": {"en": "To:", "fr": "À :"},
     "Subject:": {"en": "Subject:", "fr": "Objet :"},
@@ -86,7 +85,7 @@ TRANSLATIONS = {
     },
     "Edit Preview": {"en": "Edit Preview", "fr": "Modifier l'Aperçu"},
     "Back to Generation": {"en": "Back to Generation", "fr": "Retour à la Génération"},
-    "Email Content Preview & Edit": {"en": "Email Content Preview & Edit", "fr": "Aperçu et Modification du Contenu de l'E-mail"},
+    "Email Content Preview & Send": {"en": "Email Content Preview & Send", "fr": "Aperçu et Envoi du Contenu de l'E-mail"},
     "Preview for ": {"en": "Preview for ", "fr": "Aperçu pour "},
     "Proceed to Send Emails": {"en": "Proceed to Send Emails", "fr": "Procéder à l'Envoi des E-mails"},
     "Please generate emails first.": {"en": "Please generate emails first.", "fr": "Veuillez d'abord générer les e-mails."},
@@ -94,7 +93,27 @@ TRANSLATIONS = {
     "This email is a template. The '{{Name}}' placeholder will be replaced with each contact's name.": {
         "en": "This email is a template. The '{{Name}}' placeholder will be replaced with each contact's name.",
         "fr": "Cet e-mail est un modèle. Le marqueur '{{Name}}' sera remplacé par le nom de chaque contact."
-    }
+    },
+    "Send All Emails": {"en": "Send All Emails", "fr": "Envoyer tous les E-mails"},
+    "Sending emails...": {"en": "Sending emails...", "fr": "Envoi des e-mails..."},
+    "Sending Activity Log": {"en": "Sending Activity Log", "fr": "Journal d'activité d'envoi"},
+    "Error generating template email:": {"en": "Error generating template email:", "fr": "Erreur lors de la génération du modèle d'e-mail :"},
+    "Email Body:": {"en": "Email Body:", "fr": "Corps de l'e-mail :"},
+    "Subject:": {"en": "Subject:", "fr": "Objet :"},
+    "Optional Generic Greeting for Non-Personalized Emails:": {
+        "en": "Optional Generic Greeting for Non-Personalized Emails:",
+        "fr": "Salutation Générique Optionnelle pour les E-mails Non Personnalisés :"
+    },
+    "e.g., 'Dear Valued Customer,', 'Hello Team,'": {
+        "en": "e.g., 'Dear Valued Customer,', 'Hello Team,'",
+        "fr": "ex: 'Cher Client Estimé,', 'Bonjour l'équipe,'"
+    },
+    "Leave empty to use '{{Name}}' placeholder. This field is ignored if 'Personalize each email' is checked.": {
+        "en": "Leave empty to use '{{Name}}' placeholder. This field is ignored if 'Personalize each email' is checked.",
+        "fr": "Laissez vide pour utiliser le marqueur '{{Name}}'. Ce champ est ignoré si 'Personnaliser chaque e-mail' est coché."
+    },
+    "Preview Mode:": {"en": "Preview Mode:", "fr": "Mode Aperçu :"},
+    "View as rendered HTML": {"en": "View as rendered HTML", "fr": "Voir en tant que HTML rendu"},
 }
 
 # Helper function for translations
