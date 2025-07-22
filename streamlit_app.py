@@ -78,7 +78,7 @@ with col_lang_select:
     )
 
 # Customized and friendly main title
-st.markdown("<h1 style='text-align: center; color: #1E90FF;'>✨ Assistant E-mail IA ✨</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #0056b3; font-size: 2.5em; padding-bottom: 20px;'>📧 Assistant E-mail IA Professionnel</h1>", unsafe_allow_html=True)
 
 
 # --- Navigation Buttons (Conditional Rendering based on page) ---
@@ -96,7 +96,7 @@ elif st.session_state.page == 'sending_log':
 
 # --- Page 1: Email Generation (Page 'generate') ---
 if st.session_state.page == 'generate':
-    # Removed st.header(_t("Configuration"))
+    # Removed st.header(_t("Configuration")) as requested
 
     # Check if sender credentials and OpenAI API key are loaded from config.py
     if not selected_sender_email or not selected_sender_password:
@@ -193,17 +193,17 @@ if st.session_state.page == 'generate':
                         st.success(f"{_t('Generated ')}{1}{_t(' template email!')}") # Report 1 template generated
 
                         # --- Apply generic greeting to template for preview if applicable ---
-                        preview_body = st.session_state.template_email['body']
+                        # This logic is crucial for the preview
+                        preview_body_content = st.session_state.template_email['body']
                         if st.session_state.generic_greeting:
                             # Replace {{Name}} in the template body with the generic greeting for preview
-                            preview_body = preview_body.replace('{{Name}}', st.session_state.generic_greeting)
+                            preview_body_content = preview_body_content.replace('{{Name}}', st.session_state.generic_greeting)
                         else:
                             # If no generic greeting, replace {{Name}} with 'Client' or a similar placeholder for better preview context
-                            # This 'Client' placeholder is for display only; the actual sending logic will use the real name.
-                            preview_body = preview_body.replace('{{Name}}', 'Client') # Default placeholder for preview
+                            preview_body_content = preview_body_content.replace('{{Name}}', 'Client') # Default placeholder for preview
 
                         st.session_state.editable_preview_subject = st.session_state.template_email['subject']
-                        st.session_state.editable_preview_body = preview_body # Set the modified body for preview
+                        st.session_state.editable_preview_body = preview_body_content # Set the modified body for preview
 
                         st.session_state.page = 'preview' # Move to preview page
                         st.rerun() # Rerun to scroll to top
@@ -242,6 +242,9 @@ if st.session_state.page == 'generate':
 # --- Page 2: Email Content Preview & Send (Page 'preview') ---
 elif st.session_state.page == 'preview':
     # Re-calculate preview content each time the page loads to ensure freshness
+    # This block ensures that editable_preview_subject and editable_preview_body
+    # always reflect the latest state based on personalized_emails or template_email
+    # and the generic_greeting, ensuring the correct salutation is shown.
     preview_subject_initial = ""
     preview_body_initial = ""
     preview_name_display = ""
@@ -256,14 +259,14 @@ elif st.session_state.page == 'preview':
         # Ensure the body reflects the generic greeting or placeholder for preview
         temp_body = st.session_state.template_email['body']
         if st.session_state.generic_greeting:
-            # IMPORTANT: Ensure the template body actually contains {{Name}} to be replaced
+            # Replace {{Name}} in the template body with the generic greeting for preview
             temp_body = temp_body.replace('{{Name}}', st.session_state.generic_greeting)
         else:
             temp_body = temp_body.replace('{{Name}}', 'Client') # Placeholder for preview if no generic greeting
         preview_body_initial = temp_body
         preview_name_display = "Template"
 
-    # Update editable session states with fresh values
+    # Update editable session states with freshly calculated values
     st.session_state.editable_preview_subject = preview_subject_initial
     st.session_state.editable_preview_body = preview_body_initial
 
@@ -335,17 +338,21 @@ elif st.session_state.page == 'preview':
                     final_emails_to_send = []
                     if not st.session_state.personalize_emails:
                         # Build the full list of emails for sending based on the edited template
-                        # The editable_preview_body already contains the generic greeting if set.
-                        # If generic_greeting was NOT set, editable_preview_body contains 'Client' as placeholder.
-                        # In that case, replace 'Client' with the actual contact name for sending.
+                        # The editable_preview_body already contains the generic greeting if set (or 'Client' placeholder).
                         for contact in st.session_state.contacts:
                             body_for_sending = st.session_state.editable_preview_body
-                            if not st.session_state.generic_greeting:
-                                 body_for_sending = body_for_sending.replace('Client', contact['name'])
-                            # Ensure {{Name}} is replaced by the actual contact name during sending for template-based mode
-                            # This handles cases where the template might still contain {{Name}} if not fully replaced in preview,
-                            # or if 'Client' placeholder needs to be replaced by actual name.
-                            body_for_sending = body_for_sending.replace('{{Name}}', contact['name'])
+
+                            # Always ensure {{Name}} (if it somehow slipped through) or 'Client' placeholder is replaced by the actual contact name for SENDING
+                            if '{{Name}}' in body_for_sending:
+                                body_for_sending = body_for_sending.replace('{{Name}}', contact['name'])
+                            elif st.session_state.generic_greeting:
+                                # If generic greeting was used for preview, ensure it's still there
+                                # No replacement needed if generic greeting already applied for preview
+                                pass
+                            else:
+                                # If 'Client' was used as a placeholder in preview, replace it with the actual name for sending
+                                body_for_sending = body_for_sending.replace('Client', contact['name'])
+
 
                             final_emails_to_send.append({
                                 "name": contact['name'],

@@ -73,7 +73,7 @@ TRANSLATIONS = {
     "Sender credentials (from config):": {"en": "Sender credentials (from config):", "fr": "Identifiants de l'expéditeur (depuis config) :"},
     "OpenAI key (from config):": {"en": "OpenAI key (from config):", "fr": "Clé OpenAI (depuis config) :"},
     "DEBUG: SENDER_EMAIL retrieved:": {"en": "DEBUG: SENDER_EMAIL retrieved:", "fr": "DÉBOGAGE : E-mail de l'expéditeur récupéré :"},
-    "DEBUG: SENDER_PASSWORD present:": {"en": "DEBUG: SENDER_PASSWORD present:", "fr": "DÉBOGAGE : Mot de passe de l'expéditeur présent :"},
+    "DEBUG: SENDER_PASSWORD present:": {"en": "DEBUG: SENDER_PASSWORD present:": {"en": "DEBUG: SENDER_PASSWORD present:", "fr": "DÉBOGAGE : Mot de passe de l'expéditeur présent :"},
     "DEBUG: FAILED_EMAILS_LOG_PATH:": {"en": "DEBUG: FAILED_EMAILS_LOG_PATH:", "fr": "DÉBOGAGE : Chemin du log des e-mails échoués :"},
     "e.g., 'An invitation to our annual charity gala, highlighting guest speaker Jane Doe and live music.'": {
         "en": "e.g., 'An invitation to our annual charity gala, highlighting guest speaker Jane Doe and live music.'",
