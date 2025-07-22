@@ -20,11 +20,4 @@ if SENDER_EMAIL and SENDER_PASSWORD:
 
 # --- LOGGING CONFIGURATION ---
 # Path for logging failed email attempts. This is not a secret.
-FAILED_EMAILS_LOG_PATH = "failed_emails.log" # Or you can use a path like "logs/failed_emails.log" if you create a 'logs' folder
-
-# For debugging (these will show in your Streamlit Cloud app's UI if still in streamlit_app.py)
-# print(f"DEBUG_CONFIG: Raw APP_CREDENTIALS: {APP_CREDENTIALS}")
-# print(f"DEBUG_CONFIG: SENDER_EMAIL: {SENDER_EMAIL}")
-# print(f"DEBUG_CONFIG: SENDER_PASSWORD present: {bool(SENDER_PASSWORD)}") # Only show if it's there
-# print(f"DEBUG_CONFIG: OPENAI_API_KEY present: {bool(OPENAI_API_KEY)}") # Only show if it's there
-# print(f"DEBUG_CONFIG: FAILED_EMAILS_LOG_PATH: {FAILED_EMAILS_LOG_PATH}")
+FAILED_EMAILS_LOG_PATH = "failed_emails.log" # This path will be created in your app's root directory on Streamlit Cloud

@@ -1,78 +1,121 @@
 # email_tool.py
-import yagmail
+
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
 import datetime
-import os
 import re
+import os # Import os for path manipulation
 
-# We import FAILED_EMAILS_LOG_PATH from config.py for logging purposes
-from config import FAILED_EMAILS_LOG_PATH
+# The FAILED_EMAILS_LOG_PATH will now be passed as an argument from streamlit_app.py
+# So, remove `from config import FAILED_EMAILS_LOG_PATH` from here
+# and adjust the _log_failed_email_to_file function accordingly.
 
-def _log_failed_email_to_file(sender_email, to_email, subject, body, error_message):
+
+def _log_failed_email_to_file(sender_email, to_email, subject, body, error_message, log_path): # <--- ADD log_path parameter
     """Logs details of a failed email attempt to a dedicated file."""
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_entry = (
-        f"[{timestamp}] From: {sender_email}, To: {to_email}, Subject: {subject}\n"
+        f"Timestamp: {timestamp}\n"
+        f"Sender: {sender_email}\n"
+        f"Recipient: {to_email}\n"
+        f"Subject: {subject}\n"
         f"Error: {error_message}\n"
-        f"--------------------------------------------------\n"
+        f"Body Snippet (first 200 chars): {body[:200]}...\n"
+        f"{'-'*50}\n\n"
     )
-    try:
-        log_dir = os.path.dirname(FAILED_EMAILS_LOG_PATH)
-        if log_dir and not os.path.exists(log_dir):
-            os.makedirs(log_dir, exist_ok=True)
-            print(f"DEBUG: email_tool.py: Created failed emails log directory: {log_dir}")
-        with open(FAILED_EMAILS_LOG_PATH, "a", encoding="utf-8") as f:
-            f.write(log_entry)
-            f.flush()
-        print(f"CONSOLE LOG: email_tool.py: Logged failed email to {FAILED_EMAILS_LOG_PATH} for {to_email}.")
-    except Exception as e:
-        print(f"ERROR: email_tool.py: Could not write to failed emails log file '{FAILED_EMAILS_LOG_PATH}': {e}")
-
-
-def send_email_message(sender_email: str, sender_password: str, to_email: str, subject: str, body: str) -> dict:
-    """
-    Sends an email using yagmail with dynamically provided sender credentials.
-    Returns a dictionary indicating status and message.
-    """
-    if not sender_email or not sender_password:
-        error_msg = "Email sender credentials (sender_email or sender_password) are not provided."
-        _log_failed_email_to_file(sender_email, to_email, subject, body, error_msg)
-        print(f"ERROR: email_tool.py: {error_msg}")
-        return {"status": "failed", "message": error_msg}
-
-    # Basic validation for the recipient email format
-    if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', to_email):
-        error_msg = f"Invalid recipient email format: {to_email}"
-        _log_failed_email_to_file(sender_email, to_email, subject, body, error_msg)
-        print(f"ERROR: email_tool.py: {error_msg}")
-        return {"status": "failed", "message": error_msg}
-
-    try:
-        print(f"CONSOLE LOG: email_tool.py: Attempting to send email from {sender_email} to {to_email}...")
+    # Ensure the directory for the log file exists if it's a relative path
+    log_dir = os.path.dirname(log_path)
+    if log_dir and not os.path.exists(log_dir):
+        os.makedirs(log_dir)
         
-        # Initialize yagmail SMTP client with provided credentials
-        yag = yagmail.SMTP(user=sender_email, password=sender_password)
-        
-        # Send the email
-        yag.send(
-            to=to_email,
-            subject=subject,
-            contents=body
-        )
-        print(f"CONSOLE LOG: email_tool.py: yagmail.send() call completed for {to_email}.")
+    with open(log_path, "a", encoding="utf-8") as f:
+        f.write(log_entry)
+
+def send_email_message(sender_email, sender_password, to_email, subject, body, attachments=None, log_path="failed_emails.log"): # <--- ADD log_path parameter here with a default
+    """
+    Sends an email message with optional attachments using an SMTP server.
+
+    Args:
+        sender_email (str): The sender's email address.
+        sender_password (str): The sender's app password (for Google, Outlook, etc.).
+        to_email (str): The recipient's email address.
+        subject (str): The subject of the email.
+        body (str): The body content of the email.
+        attachments (list, optional): A list of file paths to attach. Defaults to None.
+        log_path (str, optional): Path to the file where failed emails should be logged.
+                                  Defaults to "failed_emails.log".
+
+    Returns:
+        dict: A dictionary with 'status' ("success" or "error") and 'message'.
+    """
+    # Basic email validation
+    if not re.match(r"[^@]+@[^@]+\.[^@]+", to_email):
+        _log_failed_email_to_file(sender_email, to_email, subject, body, "Invalid recipient email format", log_path)
+        return {"status": "error", "message": "Invalid recipient email format."}
+
+    msg = MIMEMultipart()
+    msg['From'] = sender_email
+    msg['To'] = to_email
+    msg['Subject'] = subject
+
+    msg.attach(MIMEText(body, 'html')) # Changed to html as recommended for richer content
+
+    if attachments:
+        for attachment_path in attachments:
+            if not os.path.exists(attachment_path):
+                error_msg = f"Attachment file not found: {attachment_path}"
+                _log_failed_email_to_file(sender_email, to_email, subject, body, error_msg, log_path)
+                return {"status": "error", "message": error_msg}
+
+            try:
+                with open(attachment_path, "rb") as attachment:
+                    part = MIMEBase("application", "octet-stream")
+                    part.set_payload(attachment.read())
+                encoders.encode_base64(part)
+                part.add_header(
+                    "Content-Disposition",
+                    f"attachment; filename= {os.path.basename(attachment_path)}",
+                )
+                msg.attach(part)
+            except Exception as e:
+                error_msg = f"Failed to attach file {os.path.basename(attachment_path)}: {e}"
+                _log_failed_email_to_file(sender_email, to_email, subject, body, error_msg, log_path)
+                return {"status": "error", "message": error_msg}
+
+    try:
+        # Determine SMTP server based on sender email domain
+        if "gmail.com" in sender_email:
+            smtp_server = "smtp.gmail.com"
+            smtp_port = 587
+        elif "outlook.com" in sender_email or "hotmail.com" in sender_email:
+            smtp_server = "smtp.office365.com"
+            smtp_port = 587
+        else:
+            _log_failed_email_to_file(sender_email, to_email, subject, body, "Unsupported sender email domain", log_path)
+            return {"status": "error", "message": "Unsupported sender email domain. Only Gmail and Outlook/Hotmail are currently supported."}
+
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(sender_email, sender_password)
+            server.send_message(msg)
         return {"status": "success", "message": "Email sent successfully."}
 
-    except yagmail.YagAuthenticationError as e:
-        error_msg = f"Authentication failed for {sender_email}. Check credentials (App Password for Gmail with 2FA?). Error: {e}"
-        _log_failed_email_to_file(sender_email, to_email, subject, body, error_msg)
-        print(f"ERROR: email_tool.py: {error_msg}")
-        return {"status": "failed", "message": error_msg}
-    except yagmail.YagConnectionError as e:
-        error_msg = f"Connection error to SMTP server for {sender_email}. Check internet connection or SMTP settings. Error: {e}"
-        _log_failed_email_to_file(sender_email, to_email, subject, body, error_msg)
-        print(f"ERROR: email_tool.py: {error_msg}")
-        return {"status": "failed", "message": error_msg}
+    except smtplib.SMTPAuthenticationError as e:
+        error_msg = f"SMTP Authentication Error: {e}. Check email/password or app password settings."
+        _log_failed_email_to_file(sender_email, to_email, subject, body, error_msg, log_path)
+        return {"status": "error", "message": error_msg}
+    except smtplib.SMTPConnectError as e:
+        error_msg = f"SMTP Connection Error: {e}. Check server address or network."
+        _log_failed_email_to_file(sender_email, to_email, subject, body, error_msg, log_path)
+        return {"status": "error", "message": error_msg}
+    except smtplib.SMTPException as e:
+        error_msg = f"SMTP Error: {e}. A general SMTP error occurred."
+        _log_failed_email_to_file(sender_email, to_email, subject, body, error_msg, log_path)
+        return {"status": "error", "message": error_msg}
     except Exception as e:
-        error_msg = f"An unexpected error occurred while sending email from {sender_email}: {e}"
-        _log_failed_email_to_file(sender_email, to_email, subject, body, error_msg)
-        print(f"ERROR: email_tool.py: {error_msg}")
-        return {"status": "failed", "message": error_msg}
+        error_msg = f"An unexpected error occurred during email sending: {e}"
+        _log_failed_email_to_file(sender_email, to_email, subject, body, error_msg, log_path)
+        return {"status": "error", "message": error_msg}
