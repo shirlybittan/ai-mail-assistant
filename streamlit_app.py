@@ -77,7 +77,8 @@ with col_lang_select:
         index=default_lang_index # Set default index
     )
 
-st.title(f"📧 {_t('AI Email Assistant')}")
+# Customized and friendly main title
+st.markdown("<h1 style='text-align: center; color: #1E90FF;'>✨ Assistant E-mail IA ✨</h1>", unsafe_allow_html=True)
 
 
 # --- Navigation Buttons (Conditional Rendering based on page) ---
@@ -95,7 +96,7 @@ elif st.session_state.page == 'sending_log':
 
 # --- Page 1: Email Generation (Page 'generate') ---
 if st.session_state.page == 'generate':
-    st.header(_t("Configuration"))
+    # Removed st.header(_t("Configuration"))
 
     # Check if sender credentials and OpenAI API key are loaded from config.py
     if not selected_sender_email or not selected_sender_password:
@@ -255,6 +256,7 @@ elif st.session_state.page == 'preview':
         # Ensure the body reflects the generic greeting or placeholder for preview
         temp_body = st.session_state.template_email['body']
         if st.session_state.generic_greeting:
+            # IMPORTANT: Ensure the template body actually contains {{Name}} to be replaced
             temp_body = temp_body.replace('{{Name}}', st.session_state.generic_greeting)
         else:
             temp_body = temp_body.replace('{{Name}}', 'Client') # Placeholder for preview if no generic greeting
@@ -276,7 +278,6 @@ elif st.session_state.page == 'preview':
             if not st.session_state.generic_greeting: # If no generic greeting was provided
                 st.info(_t("This email is a template. The '{{Name}}' placeholder will be replaced with each contact's name."))
             else: # If generic greeting was provided
-                # Corrected translation for this info message
                 st.info(f"{_t('This email is a template. The greeting has been set to:')} **{st.session_state.generic_greeting}**")
         st.warning(_t("This is a preview of the FIRST email generated. The content will vary if 'Personalize Emails' is checked."))
 
@@ -341,6 +342,10 @@ elif st.session_state.page == 'preview':
                             body_for_sending = st.session_state.editable_preview_body
                             if not st.session_state.generic_greeting:
                                  body_for_sending = body_for_sending.replace('Client', contact['name'])
+                            # Ensure {{Name}} is replaced by the actual contact name during sending for template-based mode
+                            # This handles cases where the template might still contain {{Name}} if not fully replaced in preview,
+                            # or if 'Client' placeholder needs to be replaced by actual name.
+                            body_for_sending = body_for_sending.replace('{{Name}}', contact['name'])
 
                             final_emails_to_send.append({
                                 "name": contact['name'],

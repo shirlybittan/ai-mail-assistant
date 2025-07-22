@@ -10,7 +10,7 @@ LANGUAGES = {
 TRANSLATIONS = {
     # UI elements
     "AI Email Assistant": {"en": "AI Email Assistant", "fr": "Assistant E-mail IA"},
-    "Configuration": {"en": "Configuration", "fr": "Configuration"},
+    "Configuration": {"en": "Configuration", "fr": "Configuration"}, # This translation key remains for _t() but the header usage is removed.
     "Upload your contacts Excel file": {"en": "Upload your contacts Excel file", "fr": "Téléchargez votre fichier Excel de contacts"},
     "Add Attachments (Optional)": {"en": "Add Attachments (Optional)", "fr": "Ajouter des Pièces Jointes (Optionnel)"},
     "Email Content Request": {"en": "Email Content Request", "fr": "Demande de Contenu d'E-mail"},
@@ -129,6 +129,10 @@ TRANSLATIONS = {
     "Confirm and Send": {
         "en": "Confirm and Send",
         "fr": "Confirmer et Envoyer"
+    },
+    "Hello! How can I help you?": {
+        "en": "Hello! How can I help you?",
+        "fr": "Bonjour ! Comment puis-je vous aider ?"
     }
 }
 
