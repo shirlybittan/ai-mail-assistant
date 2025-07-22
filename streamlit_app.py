@@ -60,7 +60,7 @@ if 'editable_preview_body' not in st.session_state: # Body as seen/edited in pre
 # States for sending process
 if 'email_sending_status' not in st.session_state:
     st.session_state.email_sending_status = []
-if 'sending_in_progress' not in st.session_state: # Track if sending process is active
+if 'sending_in_progress' not in st.session_state:
     st.session_state.sending_in_progress = False
 
 
@@ -205,7 +205,7 @@ if st.session_state.page == 'generate':
                         st.session_state.editable_preview_body = preview_body # Set the modified body for preview
 
                         st.session_state.page = 'preview' # Move to preview page
-                        st.rerun()
+                        st.rerun() # Rerun to scroll to top
 
                 else:
                     # Generate individually if personalizing
@@ -235,17 +235,15 @@ if st.session_state.page == 'generate':
                         st.session_state.editable_preview_subject = first_email['subject']
                         st.session_state.editable_preview_body = first_email['body']
                         st.session_state.page = 'preview' # Move to preview page
-                        st.rerun()
+                        st.rerun() # Rerun to scroll to top
 
 
 # --- Page 2: Email Content Preview & Send (Page 'preview') ---
 elif st.session_state.page == 'preview':
-    st.header(_t("Email Content Preview & Send"))
-
-    # Determine which content to display for preview
+    # Re-calculate preview content each time the page loads to ensure freshness
     preview_subject_initial = ""
     preview_body_initial = ""
-    preview_name_display = "" # Name for the "Preview for" label
+    preview_name_display = ""
 
     if st.session_state.personalize_emails and st.session_state.generated_personalized_emails:
         first_email = st.session_state.generated_personalized_emails[0]
@@ -253,34 +251,45 @@ elif st.session_state.page == 'preview':
         preview_body_initial = first_email['body']
         preview_name_display = first_email['name']
     elif st.session_state.template_email:
-        # For template, the editable_preview_body already contains the applied generic greeting
         preview_subject_initial = st.session_state.template_email['subject']
-        preview_body_initial = st.session_state.editable_preview_body # Use the already processed body for preview
-        preview_name_display = "Template" # For template mode, show "Template" as name placeholder
+        # Ensure the body reflects the generic greeting or placeholder for preview
+        temp_body = st.session_state.template_email['body']
+        if st.session_state.generic_greeting:
+            temp_body = temp_body.replace('{{Name}}', st.session_state.generic_greeting)
+        else:
+            temp_body = temp_body.replace('{{Name}}', 'Client') # Placeholder for preview if no generic greeting
+        preview_body_initial = temp_body
+        preview_name_display = "Template"
 
+    # Update editable session states with fresh values
+    st.session_state.editable_preview_subject = preview_subject_initial
+    st.session_state.editable_preview_body = preview_body_initial
+
+
+    st.header(_t("Email Content Preview & Send"))
 
     if not (st.session_state.generated_personalized_emails or st.session_state.template_email):
         st.warning(_t("Please generate emails first."))
     else:
-        st.subheader(f"{_t('Preview for ')}{preview_name_display}")
-
         # Information about the preview mode (template vs. personalized)
         if not st.session_state.personalize_emails:
             if not st.session_state.generic_greeting: # If no generic greeting was provided
                 st.info(_t("This email is a template. The '{{Name}}' placeholder will be replaced with each contact's name."))
             else: # If generic greeting was provided
+                # Corrected translation for this info message
                 st.info(f"{_t('This email is a template. The greeting has been set to:')} **{st.session_state.generic_greeting}**")
         st.warning(_t("This is a preview of the FIRST email generated. The content will vary if 'Personalize Emails' is checked."))
 
         # Display editable subject and body
         st.session_state.editable_preview_subject = st.text_input(
-            _t("Subject:"), value=st.session_state.editable_preview_subject or preview_subject_initial,
+            _t("Subject:"), value=st.session_state.editable_preview_subject, # Use the re-calculated value
             key="editable_subject"
         )
 
         st.markdown(f"**{_t('Email Body:')}**")
         st.session_state.editable_preview_body = st.text_area(
-            "", value=st.session_state.editable_preview_body or preview_body_initial, height=400,
+            "", value=st.session_state.editable_preview_body, # Use the re-calculated value
+            height=400,
             key="editable_body"
         )
 
@@ -300,7 +309,7 @@ elif st.session_state.page == 'preview':
                 "txt", "csv", "rtf"
             ],
             accept_multiple_files=True,
-            key="attachment_uploader_preview_page" # Changed key to be unique on this page
+            key="attachment_uploader_preview_page"
         )
 
         if st.session_state.uploaded_attachments:
@@ -472,7 +481,7 @@ elif st.session_state.page == 'sending_log':
                 'uploaded_attachments', 'contacts', 'contact_issues',
                 'user_prompt', 'user_email_context', 'personalize_emails',
                 'editable_preview_subject', 'editable_preview_body', 'sending_in_progress',
-                'generic_greeting', 'final_emails_to_send' # Added new keys to reset
+                'generic_greeting', 'final_emails_to_send'
             ]:
                 if key in st.session_state:
                     del st.session_state[key]
