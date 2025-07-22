@@ -11,8 +11,18 @@ import os       # For path operations
 import shutil   # For deleting temporary directories
 import datetime # For timestamping in logs
 
-# Set Streamlit page configuration
+
+# Set Streamlit page configuration 
 st.set_page_config(layout="wide", page_title="AI Email Assistant")
+
+# --- DEBUGGING INFO START ---
+# Place debugging lines AFTER st.set_page_config()
+st.subheader("Debugging Info (REMOVE AFTER TROUBLESHOOTING)")
+st.write("All secrets from st.secrets:", st.secrets.to_dict())
+st.write("Sender credentials (from config):", SENDER_CREDENTIALS)
+st.write("OpenAI key (from config):", OPENAI_API_KEY)
+st.markdown("---")
+# --- DEBUGGING INFO END ---
 
 # --- Initialize session state variables ---
 # Ensure ALL session state variables are initialized here
