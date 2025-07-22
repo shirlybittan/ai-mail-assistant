@@ -82,12 +82,12 @@ st.title(f"📧 {_t('AI Email Assistant')}")
 
 # --- Navigation Buttons (Conditional Rendering based on page) ---
 if st.session_state.page == 'preview':
-    if st.button(_t("Back to Generation")):
+    if st.button(_t("Back to Generation"), key="back_to_generation_preview"):
         st.session_state.page = 'generate'
         st.rerun()
 elif st.session_state.page == 'sending_log':
     # This button allows going back to generation from the log page
-    if st.button(_t("Back to Generation")):
+    if st.button(_t("Back to Generation"), key="back_to_generation_log"):
         st.session_state.page = 'generate'
         st.rerun()
     # The "Start New Email Session" button is at the bottom of the sending_log page
@@ -123,6 +123,7 @@ if st.session_state.page == 'generate':
         st.info(_t("Please upload an Excel file to proceed."))
         st.session_state.contacts = [] # Clear contacts if file is removed
 
+
     # User input for email generation
     st.subheader(_t("Email Content Request"))
     st.session_state.user_prompt = st.text_area(
@@ -153,85 +154,88 @@ if st.session_state.page == 'generate':
     st.info(_t("This field is ignored if 'Personalize each email' is checked."))
 
 
-    st.header(_t("Generate Emails"))
-
-    if st.button(_t("Generate Emails for Contacts")):
-        if not st.session_state.contacts:
-            st.error(_t("Please upload an Excel file with contacts first."))
-        elif not st.session_state.user_prompt:
-            st.error(_t("Please provide a description for the email."))
-        elif not OPENAI_API_KEY:
-            st.error(_t("OpenAI API Key not found. Cannot generate emails."))
-        else:
-            st.session_state.generated_personalized_emails = [] # Clear previous list
-            st.session_state.template_email = None # Clear previous template
-
-            try:
-                agent = SmartEmailAgent(openai_api_key=OPENAI_API_KEY)
-            except ValueError as e:
-                st.error(f"{_t('Error initializing AI agent: ')}{e}. {_t('Please check your OpenAI API Key.')}")
-                st.stop()
-
-            if not st.session_state.personalize_emails:
-                # Generate a single template (faster for non-personalized)
-                with st.spinner(_t("Generating emails...")):
-                    template_output = agent.generate_email(
-                        prompt=st.session_state.user_prompt,
-                        personalize=False, # Explicitly generate template with {{Name}}
-                        user_email_context=st.session_state.user_email_context,
-                        output_language=st.session_state.language
-                    )
-
-                if "Error" in template_output["subject"]:
-                    st.error(f"{_t('Error generating template email:')} {template_output['body']}")
-                else:
-                    st.session_state.template_email = template_output
-                    st.success(f"{_t('Generated ')}{1}{_t(' template email!')}") # Report 1 template generated
-
-                    # --- Apply generic greeting to template for preview if applicable ---
-                    preview_body = st.session_state.template_email['body']
-                    if st.session_state.generic_greeting:
-                        # Replace {{Name}} in the template body with the generic greeting for preview
-                        preview_body = preview_body.replace('{{Name}}', st.session_state.generic_greeting)
-                    else:
-                        # If no generic greeting, replace {{Name}} with 'Client' or a similar placeholder for better preview context
-                        preview_body = preview_body.replace('{{Name}}', 'Client') # Default placeholder for preview
-
-                    st.session_state.editable_preview_subject = st.session_state.template_email['subject']
-                    st.session_state.editable_preview_body = preview_body # Set the modified body for preview
-
-                    st.session_state.page = 'preview' # Move to preview page
-                    st.rerun()
-
+    # Make the "Generate Emails" button more central and prominent
+    st.markdown("---") # Add a separator for visual grouping
+    col_gen_btn_1, col_gen_btn_2, col_gen_btn_3 = st.columns([1, 2, 1])
+    with col_gen_btn_2:
+        if st.button(_t("Generate Emails for Contacts"), type="primary", use_container_width=True):
+            if not st.session_state.contacts:
+                st.error(_t("Please upload an Excel file with contacts first."))
+            elif not st.session_state.user_prompt:
+                st.error(_t("Please provide a description for the email."))
+            elif not OPENAI_API_KEY:
+                st.error(_t("OpenAI API Key not found. Cannot generate emails."))
             else:
-                # Generate individually if personalizing
-                generation_progress_bar = st.progress(0, text=_t("Generating emails..."))
-                for i, contact in enumerate(st.session_state.contacts):
-                    email_output = agent.generate_email(
-                        prompt=st.session_state.user_prompt,
-                        contact_name=contact['name'],
-                        personalize=True,
-                        user_email_context=st.session_state.user_email_context,
-                        output_language=st.session_state.language
-                    )
-                    st.session_state.generated_personalized_emails.append({
-                        "name": contact['name'],
-                        "email": contact['email'],
-                        "subject": email_output['subject'],
-                        "body": email_output['body']
-                    })
-                    generation_progress_bar.progress((i + 1) / len(st.session_state.contacts), text=f"{_t('Generating email for ')}{contact['name']}...")
+                st.session_state.generated_personalized_emails = [] # Clear previous list
+                st.session_state.template_email = None # Clear previous template
 
-                generation_progress_bar.empty()
-                st.success(f"{_t('Generated ')}{len(st.session_state.generated_personalized_emails)}{_t(' emails!')} ({_t('FULLY PERSONALIZED')})")
+                try:
+                    agent = SmartEmailAgent(openai_api_key=OPENAI_API_KEY)
+                except ValueError as e:
+                    st.error(f"{_t('Error initializing AI agent: ')}{e}. {_t('Please check your OpenAI API Key.')}")
+                    st.stop()
 
-                if st.session_state.generated_personalized_emails:
-                    # Set preview content to the first fully personalized email
-                    first_email = st.session_state.generated_personalized_emails[0]
-                    st.session_state.editable_preview_subject = first_email['subject']
-                    st.session_state.editable_preview_body = first_email['body']
-                    st.session_state.page = 'preview' # Move to preview page
-                    st.rerun()
+                if not st.session_state.personalize_emails:
+                    # Generate a single template (faster for non-personalized)
+                    with st.spinner(_t("Generating emails...")):
+                        template_output = agent.generate_email(
+                            prompt=st.session_state.user_prompt,
+                            personalize=False, # Explicitly generate template with {{Name}}
+                            user_email_context=st.session_state.user_email_context,
+                            output_language=st.session_state.language
+                        )
+
+                    if "Error" in template_output["subject"]:
+                        st.error(f"{_t('Error generating template email:')} {template_output['body']}")
+                    else:
+                        st.session_state.template_email = template_output
+                        st.success(f"{_t('Generated ')}{1}{_t(' template email!')}") # Report 1 template generated
+
+                        # --- Apply generic greeting to template for preview if applicable ---
+                        preview_body = st.session_state.template_email['body']
+                        if st.session_state.generic_greeting:
+                            # Replace {{Name}} in the template body with the generic greeting for preview
+                            preview_body = preview_body.replace('{{Name}}', st.session_state.generic_greeting)
+                        else:
+                            # If no generic greeting, replace {{Name}} with 'Client' or a similar placeholder for better preview context
+                            # This 'Client' placeholder is for display only; the actual sending logic will use the real name.
+                            preview_body = preview_body.replace('{{Name}}', 'Client') # Default placeholder for preview
+
+                        st.session_state.editable_preview_subject = st.session_state.template_email['subject']
+                        st.session_state.editable_preview_body = preview_body # Set the modified body for preview
+
+                        st.session_state.page = 'preview' # Move to preview page
+                        st.rerun()
+
+                else:
+                    # Generate individually if personalizing
+                    generation_progress_bar = st.progress(0, text=_t("Generating emails..."))
+                    for i, contact in enumerate(st.session_state.contacts):
+                        email_output = agent.generate_email(
+                            prompt=st.session_state.user_prompt,
+                            contact_name=contact['name'],
+                            personalize=True,
+                            user_email_context=st.session_state.user_email_context,
+                            output_language=st.session_state.language
+                        )
+                        st.session_state.generated_personalized_emails.append({
+                            "name": contact['name'],
+                            "email": contact['email'],
+                            "subject": email_output['subject'],
+                            "body": email_output['body']
+                        })
+                        generation_progress_bar.progress((i + 1) / len(st.session_state.contacts), text=f"{_t('Generating email for ')}{contact['name']}...")
+
+                    generation_progress_bar.empty()
+                    st.success(f"{_t('Generated ')}{len(st.session_state.generated_personalized_emails)}{_t(' emails!')} ({_t('FULLY PERSONALIZED')})")
+
+                    if st.session_state.generated_personalized_emails:
+                        # Set preview content to the first fully personalized email
+                        first_email = st.session_state.generated_personalized_emails[0]
+                        st.session_state.editable_preview_subject = first_email['subject']
+                        st.session_state.editable_preview_body = first_email['body']
+                        st.session_state.page = 'preview' # Move to preview page
+                        st.rerun()
 
 
 # --- Page 2: Email Content Preview & Send (Page 'preview') ---
@@ -268,11 +272,6 @@ elif st.session_state.page == 'preview':
                 st.info(f"{_t('This email is a template. The greeting has been set to:')} **{st.session_state.generic_greeting}**")
         st.warning(_t("This is a preview of the FIRST email generated. The content will vary if 'Personalize Emails' is checked."))
 
-        # Preview Mode Toggle
-        col_view_mode, _ = st.columns([0.2, 0.8])
-        with col_view_mode:
-            preview_as_html = st.checkbox(_t("View as rendered HTML"), value=False, key="preview_html_toggle")
-
         # Display editable subject and body
         st.session_state.editable_preview_subject = st.text_input(
             _t("Subject:"), value=st.session_state.editable_preview_subject or preview_subject_initial,
@@ -280,15 +279,12 @@ elif st.session_state.page == 'preview':
         )
 
         st.markdown(f"**{_t('Email Body:')}**")
-        if preview_as_html:
-            st.components.v1.html(st.session_state.editable_preview_body or preview_body_initial, height=400, scrolling=True)
-        else:
-            st.session_state.editable_preview_body = st.text_area(
-                "", value=st.session_state.editable_preview_body or preview_body_initial, height=400,
-                key="editable_body"
-            )
+        st.session_state.editable_preview_body = st.text_area(
+            "", value=st.session_state.editable_preview_body or preview_body_initial, height=400,
+            key="editable_body"
+        )
 
-        st.markdown("---") # Separator before send button
+        st.markdown("---") # Separator before attachments and send button
 
         # --- Add attachments on preview page ---
         st.subheader(_t("Add Attachments (Optional)"))
@@ -311,54 +307,58 @@ elif st.session_state.page == 'preview':
             st.info(f"{len(st.session_state.uploaded_attachments)}{_t(' file(s) selected for attachment.')}")
         st.markdown("---") # Separator after attachments
 
-        # --- Send All Emails Section ---
-        st.subheader(_t("Send Emails"))
-        st.write(f"{_t('You are about to send emails to')} **{len(st.session_state.contacts)}**{_t(' contacts.')}")
-        st.write(f"**{_t('Sending Mode:')}** {'**' + _t('FULLY PERSONALIZED') + '**' if st.session_state.personalize_emails else '**' + _t('BASÉ SUR UN MODÈLE') + '**'}")
+        # --- Send All Emails Section (Simplified) ---
+        # Simplified message
+        sending_mode_text = _t('FULLY PERSONALIZED') if st.session_state.personalize_emails else _t('BASÉ SUR UN MODÈLE')
+        st.write(f"{_t('Send emails to')} **{len(st.session_state.contacts)}** {_t('contacts')} ({sending_mode_text})")
 
+        # Centralized and prominent send button
+        col_send_btn_1, col_send_btn_2, col_send_btn_3 = st.columns([1, 2, 1])
+        with col_send_btn_2:
+            if not selected_sender_password: # Use selected_sender_password from global scope
+                st.error(f"{_t('Error: Password not found for sender email:')} `{selected_sender_email}`. {_t('Please check your Streamlit Secrets.')}")
+            else:
+                if st.button(_t("Confirm and Send"), type="primary", use_container_width=True, key="confirm_send_button"):
+                    st.session_state.email_sending_status = [] # Clear previous status log
+                    st.session_state.sending_in_progress = True # Indicate sending has started
 
-        if not selected_sender_password: # Use selected_sender_password from global scope
-            st.error(f"{_t('Error: Password not found for sender email:')} `{selected_sender_email}`. {_t('Please check your Streamlit Secrets.')}")
-        else:
-            if st.button(_t("Confirm Send All Emails"), key="confirm_send_button"):
-                st.session_state.email_sending_status = [] # Clear previous status log
-                st.session_state.sending_in_progress = True # Indicate sending has started
+                    final_emails_to_send = []
+                    if not st.session_state.personalize_emails:
+                        # Build the full list of emails for sending based on the edited template
+                        # The editable_preview_body already contains the generic greeting if set.
+                        # If generic_greeting was NOT set, editable_preview_body contains 'Client' as placeholder.
+                        # In that case, replace 'Client' with the actual contact name for sending.
+                        for contact in st.session_state.contacts:
+                            body_for_sending = st.session_state.editable_preview_body
+                            if not st.session_state.generic_greeting:
+                                 body_for_sending = body_for_sending.replace('Client', contact['name'])
 
-                final_emails_to_send = []
-                if not st.session_state.personalize_emails:
-                    # Build the full list of emails for sending based on the edited template
-                    for contact in st.session_state.contacts:
-                        body_to_use = st.session_state.editable_preview_body # This already has generic greeting or 'Client'
-                        # Now, for actual sending, we replace 'Client' back with the real name if generic greeting wasn't used
-                        if not st.session_state.generic_greeting:
-                             body_to_use = body_to_use.replace('Client', contact['name']) # Replace the preview placeholder with real name
+                            final_emails_to_send.append({
+                                "name": contact['name'],
+                                "email": contact['email'],
+                                "subject": st.session_state.editable_preview_subject,
+                                "body": body_for_sending # Use the body prepared for sending
+                            })
+                    else:
+                        # For personalized mode, take the generated list and apply edits from the preview for the first email
+                        final_emails_to_send = st.session_state.generated_personalized_emails[:] # Make a copy
+                        if final_emails_to_send: # Ensure there's at least one email
+                            final_emails_to_send[0]['subject'] = st.session_state.editable_preview_subject
+                            final_emails_to_send[0]['body'] = st.session_state.editable_preview_body
 
-                        final_emails_to_send.append({
-                            "name": contact['name'],
-                            "email": contact['email'],
-                            "subject": st.session_state.editable_preview_subject,
-                            "body": body_to_use # Use the body prepared for sending
-                        })
-                else:
-                    # For personalized mode, take the generated list and apply edits from the preview for the first email
-                    final_emails_to_send = st.session_state.generated_personalized_emails[:] # Make a copy
-                    if final_emails_to_send: # Ensure there's at least one email
-                        final_emails_to_send[0]['subject'] = st.session_state.editable_preview_subject
-                        final_emails_to_send[0]['body'] = st.session_state.editable_preview_body
+                    if not final_emails_to_send:
+                        st.error(_t("No emails to send. Please ensure contacts are loaded and emails generated."))
+                        st.session_state.sending_in_progress = False # Reset sending flag
+                        st.stop() # Stop execution if nothing to send
 
-                if not final_emails_to_send:
-                    st.error(_t("No emails to send. Please ensure contacts are loaded and emails generated."))
-                    st.session_state.sending_in_progress = False # Reset sending flag
-                    st.stop() # Stop execution if nothing to send
+                    # Store the final list of emails to be sent in session state
+                    st.session_state.final_emails_to_send = final_emails_to_send
 
-                # Store the final list of emails to be sent in session state
-                st.session_state.final_emails_to_send = final_emails_to_send
-
-                # Switch to the sending_log page and trigger rerun
-                st.session_state.page = 'sending_log'
-                st.session_state.email_sending_status.append(_t("--- Sending Emails ---"))
-                st.session_state.email_sending_status.append(f"{_t('You are about to send emails to')} {len(st.session_state.final_emails_to_send)} {_t('contacts.')}")
-                st.rerun()
+                    # Switch to the sending_log page and trigger rerun
+                    st.session_state.page = 'sending_log'
+                    st.session_state.email_sending_status.append(_t("--- Sending Emails ---"))
+                    st.session_state.email_sending_status.append(f"{_t('You are about to send emails to')} {len(st.session_state.final_emails_to_send)} {_t('contacts.')}")
+                    st.rerun()
 
 
 # --- Page 3: Sending Activity Log (Page 'sending_log') ---

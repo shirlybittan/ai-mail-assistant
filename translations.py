@@ -57,7 +57,7 @@ TRANSLATIONS = {
     "From:": {"en": "From:", "fr": "De :"},
     "To:": {"en": "To:", "fr": "À :"},
     "Subject:": {"en": "Subject:", "fr": "Objet :"},
-    "Upload photos, videos, or documents (recommended total size < 25MB per mail)": {"en": "Upload photos, videos, or documents (recommended total size < 25 Mo per e-mail)", "fr": "Téléchargez des photos, vidéos ou documents (taille totale recommandée < 25 Mo par e-mail)"},
+    "Upload photos, videos, or documents (recommended total size < 25MB per mail)": {"en": "Upload photos, videos, or documents (recommended total size < 25 Mo par e-mail)", "fr": "Téléchargez des photos, vidéos ou documents (taille totale recommandée < 25 Mo par e-mail)"},
     " file(s) selected for attachment.": {"en": " file(s) selected for attachment.", "fr": " fichier(s) sélectionné(s) pour la pièce jointe."},
     "Loaded ": {"en": "Loaded ", "fr": "Chargé "},
     " contacts.": {"en": " contacts.", "fr": " contacts."},
@@ -108,12 +108,28 @@ TRANSLATIONS = {
         "en": "e.g., 'Dear Valued Customer,', 'Hello Team,'",
         "fr": "ex: 'Cher Client Estimé,', 'Bonjour l'équipe,'"
     },
-    "This field is ignored if 'Personalize each email' is checked.": { # NEW KEY
+    "This field is ignored if 'Personalize each email' is checked.": {
         "en": "This field is ignored if 'Personalize each email' is checked.",
         "fr": "Ce champ est ignoré si 'Personnaliser chaque e-mail' est coché."
     },
     "Preview Mode:": {"en": "Preview Mode:", "fr": "Mode Aperçu :"},
     "View as rendered HTML": {"en": "View as rendered HTML", "fr": "Voir en tant que HTML rendu"},
+    "This email is a template. The greeting has been set to:": { # NEW OR MODIFIED TRANSLATION KEY
+        "en": "This email is a template. The greeting has been set to:",
+        "fr": "Cet e-mail est un modèle. La salutation a été définie sur :"
+    },
+    "Send emails to": {
+        "en": "Send emails to",
+        "fr": "Envoyer les e-mails à"
+    },
+    "contacts": { # General word for contacts
+        "en": "contacts",
+        "fr": "contacts"
+    },
+    "Confirm and Send": {
+        "en": "Confirm and Send",
+        "fr": "Confirmer et Envoyer"
+    }
 }
 
 # Helper function for translations
