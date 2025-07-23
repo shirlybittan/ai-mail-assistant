@@ -66,7 +66,8 @@ if 'sending_summary' not in st.session_state:
         'successful': 0,
         'failed': 0
     }
-
+if 'generation_in_progress' not in st.session_state:
+    st.session_state.generation_in_progress = False
 
 # --- Functions ---
 def reset_state():
@@ -89,6 +90,7 @@ def reset_state():
     }
     st.session_state.file_uploader_key += 1
     st.session_state.last_uploaded_file_name = None
+    st.session_state.generation_in_progress = False
 
 
 def generate_email_preview_and_template():
@@ -96,6 +98,7 @@ def generate_email_preview_and_template():
     Generates a single template email and a personalized preview for the first contact
     if personalization is enabled.
     """
+    st.session_state.generation_in_progress = True
     st.session_state.template_email = None
     st.session_state.email_sending_status = [_t("Generating email template... This may take a moment.")]
 
@@ -124,6 +127,7 @@ def generate_email_preview_and_template():
     else:
         st.session_state.email_sending_status.append(_t("  - ERROR: Failed to generate template email. Details: {details}", details=template['body']))
 
+    st.session_state.generation_in_progress = False
     st.session_state.page = 'preview'
 
 
@@ -225,8 +229,10 @@ if st.session_state.page == 'generate':
         
     st.markdown("---")
     
-    if st.button(_t("Generate Previews"), use_container_width=True, disabled=not st.session_state.contacts or not st.session_state.user_prompt):
-        generate_email_preview_and_template()
+    generate_button_disabled = not st.session_state.contacts or not st.session_state.user_prompt or st.session_state.generation_in_progress
+    if st.button(_t("Generate Previews"), use_container_width=True, disabled=generate_button_disabled):
+        with st.spinner(_t("Generating email... please wait")):
+            generate_email_preview_and_template()
 
 
 elif st.session_state.page == 'preview':
@@ -266,32 +272,33 @@ elif st.session_state.page == 'preview':
         template_body = st.session_state.editable_preview_body
         
         st.session_state.final_emails_to_send = []
-        for contact in st.session_state.contacts:
-            recipient_name = contact.get('name', '{{Name}}')
-            recipient_email = contact['email']
-            
-            # The new agent handles personalization, so we call it for each contact if needed
-            if st.session_state.personalize_emails:
-                agent = SmartEmailAgent(openai_api_key=OPENAI_API_KEY)
-                personalized_email = agent.generate_email(
-                    prompt=st.session_state.user_prompt,
-                    contact_info=contact,
-                    user_email_context=st.session_state.user_email_context,
-                    output_language=st.session_state.language
-                )
-                final_subject = personalized_email.get("subject")
-                final_body = personalized_email.get("body")
-            else:
-                final_subject = template_subject.replace("{{Name}}", st.session_state.generic_greeting if st.session_state.generic_greeting else recipient_name)
-                final_body = template_body.replace("{{Name}}", st.session_state.generic_greeting if st.session_state.generic_greeting else recipient_name)
-            
-            st.session_state.final_emails_to_send.append({
-                "recipient_email": recipient_email,
-                "recipient_name": recipient_name,
-                "subject": final_subject,
-                "body": final_body,
-                "attachments": st.session_state.uploaded_attachments
-            })
+        with st.spinner(_t("Preparing emails for sending...")):
+            for contact in st.session_state.contacts:
+                recipient_name = contact.get('name', '{{Name}}')
+                recipient_email = contact['email']
+                
+                # The new agent handles personalization, so we call it for each contact if needed
+                if st.session_state.personalize_emails:
+                    agent = SmartEmailAgent(openai_api_key=OPENAI_API_KEY)
+                    personalized_email = agent.generate_email(
+                        prompt=st.session_state.user_prompt,
+                        contact_info=contact,
+                        user_email_context=st.session_state.user_email_context,
+                        output_language=st.session_state.language
+                    )
+                    final_subject = personalized_email.get("subject")
+                    final_body = personalized_email.get("body")
+                else:
+                    final_subject = template_subject.replace("{{Name}}", st.session_state.generic_greeting if st.session_state.generic_greeting else recipient_name)
+                    final_body = template_body.replace("{{Name}}", st.session_state.generic_greeting if st.session_state.generic_greeting else recipient_name)
+                
+                st.session_state.final_emails_to_send.append({
+                    "recipient_email": recipient_email,
+                    "recipient_name": recipient_name,
+                    "subject": final_subject,
+                    "body": final_body,
+                    "attachments": st.session_state.uploaded_attachments
+                })
         
         st.session_state.email_sending_status.append(_t("Email sending process initiated..."))
         
@@ -360,32 +367,34 @@ elif st.session_state.page == 'preview':
 elif st.session_state.page == 'results':
     st.subheader(_t("3. Sending Results"))
     
-    cols = st.columns(3)
-    with cols[1]:
-        if st.button(_t("Start New Email Session"), use_container_width=True):
-            reset_state()
-            st.rerun()
-    
-    st.markdown("---")
-    
-    st.success(_t("Sending complete"))
-    st.write(_t("All emails have been sent or an attempt has been made for each contact."))
-    
-    st.markdown("---")
-    
-    st.subheader(_t("Summary"))
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric(_t("Total Contacts"), st.session_state.sending_summary['total_contacts'])
-    with col2:
-        st.metric(_t("Emails Successfully Sent"), st.session_state.sending_summary['successful'])
-    with col3:
-        st.metric(_t("Emails Failed to Send"), st.session_state.sending_summary['failed'])
-
-    failed_emails_log = [log for log in st.session_state.email_sending_status if 'error' in log.lower() or 'failed' in log.lower()]
-
-    if failed_emails_log:
+    # Use a container to manage vertical space more effectively
+    with st.container():
+        cols = st.columns(3)
+        with cols[1]:
+            if st.button(_t("Start New Email Session"), use_container_width=True):
+                reset_state()
+                st.rerun()
+        
         st.markdown("---")
-        with st.expander(_t("Show logs for failed emails")):
-            for log_entry in failed_emails_log:
-                st.write(log_entry)
+        
+        st.success(_t("Sending complete"))
+        st.write(_t("All emails have been sent or an attempt has been made for each contact."))
+        
+        st.markdown("---")
+        
+        st.subheader(_t("Summary"))
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric(_t("Total Contacts"), st.session_state.sending_summary['total_contacts'])
+        with col2:
+            st.metric(_t("Emails Successfully Sent"), st.session_state.sending_summary['successful'])
+        with col3:
+            st.metric(_t("Emails Failed to Send"), st.session_state.sending_summary['failed'])
+
+        failed_emails_log = [log for log in st.session_state.email_sending_status if 'error' in log.lower() or 'failed' in log.lower()]
+
+        if failed_emails_log:
+            st.markdown("---")
+            with st.expander(_t("Show logs for failed emails")):
+                for log_entry in failed_emails_log:
+                    st.write(log_entry)
