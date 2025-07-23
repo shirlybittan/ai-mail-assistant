@@ -3,7 +3,7 @@
 import streamlit as st
 import pandas as pd
 from data_handler import load_contacts_from_excel
-from email_agent import SmartEmailAgent # Use the unified email_agent
+from email_agent import SmartEmailAgent
 from email_tool import send_email_message
 from config import SENDER_CREDENTIALS, OPENAI_API_KEY, SENDER_EMAIL, SENDER_PASSWORD, FAILED_EMAILS_LOG_PATH
 import tempfile
@@ -44,12 +44,11 @@ if 'sending_in_progress' not in st.session_state:
     st.session_state.sending_in_progress = False
 
 # Email generation states
-if 'generated_personalized_emails' not in st.session_state:
-    st.session_state.generated_personalized_emails = {} # Store personalized emails
+# UNCHECKED BY DEFAULT: The 'personalize_emails' state is now False by default
+if 'personalize_emails' not in st.session_state:
+    st.session_state.personalize_emails = False
 if 'template_email' not in st.session_state:
     st.session_state.template_email = None # Store the general template email
-if 'personalize_emails' not in st.session_state:
-    st.session_state.personalize_emails = True
 if 'user_prompt' not in st.session_state:
     st.session_state.user_prompt = ""
 if 'user_email_context' not in st.session_state:
@@ -59,13 +58,6 @@ if 'generic_greeting' not in st.session_state:
 if 'final_emails_to_send' not in st.session_state:
     st.session_state.final_emails_to_send = []
 
-# --- Custom UI Components (from app.py) ---
-def local_css(file_name):
-    with open(file_name) as f:
-        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
-
-# local_css("app.py") # Use this if you save the styles to a separate app.css file
-
 
 # --- Functions ---
 def reset_state():
@@ -74,59 +66,50 @@ def reset_state():
     st.session_state.contact_issues = []
     st.session_state.uploaded_attachments = []
     st.session_state.email_sending_status = []
-    st.session_state.generated_personalized_emails = {}
     st.session_state.template_email = None
-    st.session_state.personalize_emails = True
+    st.session_state.personalize_emails = False # Reset to False
     st.session_state.user_prompt = ""
     st.session_state.user_email_context = ""
     st.session_state.generic_greeting = ""
     st.session_state.page = 'generate'
     st.session_state.final_emails_to_send = []
 
-def generate_email_previews():
-    """Generates email previews for all valid contacts."""
-    st.session_state.generated_personalized_emails = {} # Clear previous previews
-    st.session_state.email_sending_status = [_t("Generating email previews... This may take a moment.")]
+def generate_email_preview_and_template():
+    """
+    Generates a single template email and a personalized preview for the first contact
+    if personalization is enabled.
+    """
+    st.session_state.template_email = None # Clear previous template
+    st.session_state.email_sending_status = [_t("Generating email template... This may take a moment.")]
     
     agent = SmartEmailAgent(openai_api_key=OPENAI_API_KEY)
     
-    # Check if we should generate a template or personalized emails
-    if st.session_state.personalize_emails:
-        # Generate personalized emails for each contact
-        for contact in st.session_state.contacts:
-            if contact['email'] not in st.session_state.generated_personalized_emails:
-                st.session_state.email_sending_status.append(_t(f"Generating personalized email for {contact['name']} ({contact['email']})..."))
-                
-                # Call the unified generate_email method with contact info
-                preview = agent.generate_email(
-                    prompt=st.session_state.user_prompt,
-                    contact_info=contact,
-                    user_email_context=st.session_state.user_email_context,
-                    output_language=st.session_state.language
-                )
-                
-                if preview["subject"] != "Error":
-                    st.session_state.generated_personalized_emails[contact['email']] = preview
-                    st.session_state.email_sending_status.append(_t(f"  - Generated email for {contact['name']} successfully."))
-                else:
-                    st.session_state.email_sending_status.append(_t(f"  - ERROR: Failed to generate email for {contact['name']}. Details: {preview['body']}"))
-    else:
-        # Generate a single template email
-        st.session_state.email_sending_status.append(_t("Generating a general email template..."))
+    # Always generate a base template first (without personalization)
+    template = agent.generate_email(
+        prompt=st.session_state.user_prompt,
+        contact_info=None,
+        user_email_context=st.session_state.user_email_context,
+        output_language=st.session_state.language
+    )
+    
+    if template["subject"] != "Error":
+        st.session_state.template_email = template
+        st.session_state.email_sending_status.append(_t("  - Generated template email successfully."))
         
-        # Call the unified generate_email method without contact info
-        template = agent.generate_email(
-            prompt=st.session_state.user_prompt,
-            contact_info=None,
-            user_email_context=st.session_state.user_email_context,
-            output_language=st.session_state.language
-        )
-        
-        if template["subject"] != "Error":
-            st.session_state.template_email = template
-            st.session_state.email_sending_status.append(_t("  - Generated template email successfully."))
+        # If personalization is enabled, create a preview for the first contact
+        if st.session_state.personalize_emails and st.session_state.contacts:
+            first_contact = st.session_state.contacts[0]
+            preview_body = template['body'].replace("{{Name}}", first_contact.get('name', ''))
+            st.session_state.template_email['preview_subject'] = template['subject'].replace("{{Name}}", first_contact.get('name', ''))
+            st.session_state.template_email['preview_body'] = preview_body
         else:
-            st.session_state.email_sending_status.append(_t(f"  - ERROR: Failed to generate template email. Details: {template['body']}"))
+            # If not personalized, use the generic greeting placeholder for the preview
+            greeting = st.session_state.generic_greeting if st.session_state.generic_greeting else "{{Name}}"
+            preview_body = template['body'].replace("{{Name}}", greeting)
+            st.session_state.template_email['preview_subject'] = template['subject']
+            st.session_state.template_email['preview_body'] = preview_body
+    else:
+        st.session_state.email_sending_status.append(_t(f"  - ERROR: Failed to generate template email. Details: {template['body']}"))
 
     st.session_state.page = 'preview'
 
@@ -147,7 +130,7 @@ with st.sidebar:
     )
     if st.session_state.language != selected_language:
         st.session_state.language = selected_language
-        st.rerun() # FIXED: Changed from st.experimental_rerun()
+        st.rerun()
         
     st.markdown("---")
     st.markdown(_t("This app allows you to send mass personalized emails using an AI agent."))
@@ -170,7 +153,7 @@ if st.session_state.page == 'generate':
             for issue in st.session_state.contact_issues:
                 st.warning(issue)
             
-        st.rerun() # FIXED: Changed from st.experimental_rerun()
+        st.rerun()
     elif 'last_uploaded_file_name' in st.session_state and st.session_state.contacts:
         st.success(_t(f"Using previously loaded contacts: {len(st.session_state.contacts)} valid contacts found."))
         
@@ -184,7 +167,20 @@ if st.session_state.page == 'generate':
     st.markdown("---")
     
     # Email details
-    st.session_state.personalize_emails = st.checkbox(_t("Personalize emails for each contact?"), value=st.session_state.personalize_emails, key="personalize_checkbox")
+    # UNCHECKED BY DEFAULT: Set the value of the checkbox to the session state variable
+    st.session_state.personalize_emails = st.checkbox(
+        _t("Personalize emails for each contact?"),
+        value=st.session_state.personalize_emails,
+        key="personalize_checkbox"
+    )
+    
+    # SHOWS A CONDITIONAL INPUT: Only show this if personalization is off
+    if not st.session_state.personalize_emails:
+        st.session_state.generic_greeting = st.text_input(
+            _t("Generic Greeting Placeholder (e.g., 'Dear Friends')"),
+            value=st.session_state.generic_greeting,
+            key="generic_greeting_input"
+        )
     
     st.write(_t("Enter your instruction for the AI agent:"))
     st.session_state.user_prompt = st.text_area(
@@ -222,39 +218,31 @@ if st.session_state.page == 'generate':
     col1, col2 = st.columns(2)
     with col1:
         if st.button(_t("Generate Previews"), use_container_width=True, disabled=not st.session_state.contacts or not st.session_state.user_prompt):
-            generate_email_previews()
-    with col2:
-        if st.button(_t("Start Over"), use_container_width=True):
-            reset_state()
+            generate_email_preview_and_template()
+
+    # REMOVED: Removed the 'Start Over' button from this page
 
 
 elif st.session_state.page == 'preview':
     st.subheader(_t("2. Review and Send Emails"))
-    st.info(_t("Review the generated emails below. You can edit the subject and body before sending."))
+    st.info(_t("Review the generated email template below. You can edit the subject and body before sending."))
     
     tab1, tab2 = st.tabs([_t("Email Preview"), _t("Activity Log")])
     
     with tab1:
         st.subheader(_t("Email Preview"))
-        if st.session_state.personalize_emails:
-            if st.session_state.generated_personalized_emails:
-                st.info(_t(f"Showing preview for the first contact. You can modify this template, and the changes will be applied to all other emails."))
-                first_contact_email = st.session_state.contacts[0]['email']
-                first_email_preview = st.session_state.generated_personalized_emails.get(first_contact_email, {})
-
-                if first_email_preview:
-                    # Editable text inputs
-                    st.session_state.editable_preview_subject = st.text_input(_t("Subject"), value=first_email_preview.get("subject", ""), key="preview_subject")
-                    st.session_state.editable_preview_body = st.text_area(_t("Body"), value=first_email_preview.get("body", ""), height=400, key="preview_body")
-        else: # Template-based email
-            if st.session_state.template_email:
-                st.info(_t("You are sending a general template email. You can edit the subject and body below."))
-                
-                # Editable text inputs
-                st.session_state.editable_preview_subject = st.text_input(_t("Subject"), value=st.session_state.template_email.get("subject", ""), key="template_subject")
-                st.session_state.editable_preview_body = st.text_area(_t("Body"), value=st.session_state.template_email.get("body", ""), height=400, key="template_body")
-                
-                st.session_state.generic_greeting = st.text_input(_t("Generic Greeting Placeholder (e.g., 'Hello there')"), key="generic_greeting_input")
+        if st.session_state.template_email:
+            st.session_state.editable_preview_subject = st.text_input(
+                _t("Subject"),
+                value=st.session_state.template_email.get("preview_subject", ""),
+                key="preview_subject"
+            )
+            st.session_state.editable_preview_body = st.text_area(
+                _t("Body"),
+                value=st.session_state.template_email.get("preview_body", ""),
+                height=400,
+                key="preview_body"
+            )
 
     with tab2:
         st.subheader(_t("Generation Log"))
@@ -273,46 +261,33 @@ elif st.session_state.page == 'preview':
         
         # Prepare the final emails to send
         st.session_state.final_emails_to_send = []
-        if st.session_state.personalize_emails:
-            # Use the edited subject and body as the new template for personalized emails
-            template_subject = st.session_state.editable_preview_subject
-            template_body = st.session_state.editable_preview_body
+        
+        # Use the edited subject and body as the new master template
+        template_subject = st.session_state.editable_preview_subject
+        template_body = st.session_state.editable_preview_body
+        
+        for contact in st.session_state.contacts:
+            recipient_name = contact.get('name', '{{Name}}')
+            recipient_email = contact['email']
             
-            # Apply the edits to the personalized emails
-            for contact in st.session_state.contacts:
-                personalized_email = st.session_state.generated_personalized_emails.get(contact['email'], {})
-                if personalized_email:
-                    # Create the final email by replacing placeholders in the edited template
-                    final_subject = template_subject.replace("{{Name}}", contact.get('name', ''))
-                    final_body = template_body.replace("{{Name}}", contact.get('name', ''))
-                    final_body = final_body.replace("{{Email}}", contact.get('email', ''))
-                    
-                    st.session_state.final_emails_to_send.append({
-                        "recipient_email": contact['email'],
-                        "recipient_name": contact['name'],
-                        "subject": final_subject,
-                        "body": final_body,
-                        "attachments": st.session_state.uploaded_attachments
-                    })
-        else: # Template-based sending
-            template_subject = st.session_state.editable_preview_subject
-            template_body = st.session_state.editable_preview_body
-            
-            # Use the template for all contacts
-            for contact in st.session_state.contacts:
-                # Replace the generic greeting placeholder if it's set
-                if st.session_state.generic_greeting:
-                    final_body = template_body.replace("{{Name}}", st.session_state.generic_greeting)
-                else:
-                    final_body = template_body.replace("{{Name}}", contact.get('name', ''))
-                
-                st.session_state.final_emails_to_send.append({
-                    "recipient_email": contact['email'],
-                    "recipient_name": contact['name'],
-                    "subject": template_subject,
-                    "body": final_body,
-                    "attachments": st.session_state.uploaded_attachments
-                })
+            # Use the correct name or generic greeting
+            if st.session_state.personalize_emails:
+                final_name = recipient_name
+            else:
+                final_name = st.session_state.generic_greeting if st.session_state.generic_greeting else recipient_name
+
+            # Replace placeholders in the master template
+            final_subject = template_subject.replace("{{Name}}", final_name)
+            final_body = template_body.replace("{{Name}}", final_name)
+            final_body = final_body.replace("{{Email}}", recipient_email) # Always good to have this as a fallback
+
+            st.session_state.final_emails_to_send.append({
+                "recipient_email": recipient_email,
+                "recipient_name": recipient_name,
+                "subject": final_subject,
+                "body": final_body,
+                "attachments": st.session_state.uploaded_attachments
+            })
 
         
         # Proceed with sending emails
@@ -374,4 +349,4 @@ elif st.session_state.page == 'preview':
         if st.button(_t("Start New Email Session"), use_container_width=True):
             # Reset all relevant session state variables for a fresh start
             reset_state()
-            st.rerun() # FIXED: Changed from st.experimental_rerun()
+            st.rerun()
