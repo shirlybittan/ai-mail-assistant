@@ -3,13 +3,14 @@
 import streamlit as st
 import pandas as pd
 from data_handler import load_contacts_from_excel
-from email_agent import SmartEmailAgent
+from email_agent import SmartEmailAgent # Updated import
 from email_tool import send_email_message
 from config import SENDER_CREDENTIALS, OPENAI_API_KEY, SENDER_EMAIL, SENDER_PASSWORD, FAILED_EMAILS_LOG_PATH
 import tempfile
 import os
 import shutil
 import datetime
+import re
 
 # --- IMPORT LANGUAGE HELPER ---
 from translations import LANGUAGES, _t, set_language
@@ -95,24 +96,18 @@ def reset_state():
 
 def generate_email_preview_and_template():
     """
-    Generates a single template email and a personalized preview for the first contact
-    if personalization is enabled.
+    Generates a single email template with placeholders.
     """
     st.session_state.generation_in_progress = True
     st.session_state.template_email = None
     st.session_state.email_sending_status = [_t("Generating email template... This may take a moment.")]
 
-    # Correctly initialize the agent with the API key from config
+    # Create an agent instance
     agent = SmartEmailAgent(openai_api_key=OPENAI_API_KEY)
 
-    # Use the first contact for a personalized preview if personalization is enabled
-    # Otherwise, pass None to generate a template
-    contact_for_generation = st.session_state.contacts[0] if st.session_state.personalize_emails and st.session_state.contacts else None
-
-    # Call the agent's unified method
-    template = agent.generate_email(
+    # Call the agent's template generation method once
+    template = agent.generate_email_template(
         prompt=st.session_state.user_prompt,
-        contact_info=contact_for_generation,
         user_email_context=st.session_state.user_email_context,
         output_language=st.session_state.language
     )
@@ -121,7 +116,7 @@ def generate_email_preview_and_template():
         st.session_state.template_email = template
         st.session_state.email_sending_status.append(_t("  - Generated template email successfully."))
         
-        # The agent now handles personalization, so we just need to use the output
+        # We store the template directly
         st.session_state.template_email['preview_subject'] = template['subject']
         st.session_state.template_email['preview_body'] = template['body']
     else:
@@ -274,23 +269,21 @@ elif st.session_state.page == 'preview':
         st.session_state.final_emails_to_send = []
         with st.spinner(_t("Preparing emails for sending...")):
             for contact in st.session_state.contacts:
-                recipient_name = contact.get('name', '{{Name}}')
+                recipient_name = contact.get('name', 'Contact')
                 recipient_email = contact['email']
                 
-                # The new agent handles personalization, so we call it for each contact if needed
+                final_subject = template_subject
+                final_body = template_body
+                
                 if st.session_state.personalize_emails:
-                    agent = SmartEmailAgent(openai_api_key=OPENAI_API_KEY)
-                    personalized_email = agent.generate_email(
-                        prompt=st.session_state.user_prompt,
-                        contact_info=contact,
-                        user_email_context=st.session_state.user_email_context,
-                        output_language=st.session_state.language
-                    )
-                    final_subject = personalized_email.get("subject")
-                    final_body = personalized_email.get("body")
-                else:
-                    final_subject = template_subject.replace("{{Name}}", st.session_state.generic_greeting if st.session_state.generic_greeting else recipient_name)
-                    final_body = template_body.replace("{{Name}}", st.session_state.generic_greeting if st.session_state.generic_greeting else recipient_name)
+                    final_subject = final_subject.replace("{{Name}}", recipient_name)
+                    final_body = final_body.replace("{{Name}}", recipient_name)
+                elif st.session_state.generic_greeting:
+                    final_subject = final_subject.replace("{{Name}}", st.session_state.generic_greeting)
+                    final_body = final_body.replace("{{Name}}", st.session_state.generic_greeting)
+                
+                final_subject = final_subject.replace("{{Email}}", recipient_email)
+                final_body = final_body.replace("{{Email}}", recipient_email)
                 
                 st.session_state.final_emails_to_send.append({
                     "recipient_email": recipient_email,
@@ -367,7 +360,6 @@ elif st.session_state.page == 'preview':
 elif st.session_state.page == 'results':
     st.subheader(_t("3. Sending Results"))
     
-    # Use a container to manage vertical space more effectively
     with st.container():
         cols = st.columns(3)
         with cols[1]:
