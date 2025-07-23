@@ -106,7 +106,6 @@ def generate_email_preview_and_template():
         st.session_state.template_email = template
         st.session_state.email_sending_status.append(_t("  - Generated template email successfully."))
         
-        # Determine the preview text based on personalization and available contacts
         preview_subject_text = template['subject']
         preview_body_text = template['body']
         
@@ -347,6 +346,16 @@ elif st.session_state.page == 'preview':
 
 elif st.session_state.page == 'results':
     st.subheader(_t("3. Sending Results"))
+    
+    # Place the "Start New Email Session" button at the top, centered.
+    cols = st.columns(3)
+    with cols[1]:
+        if st.button(_t("Start New Email Session"), use_container_width=True):
+            reset_state()
+            st.rerun()
+    
+    st.markdown("---")
+    
     st.success(_t("Sending complete"))
     st.write(_t("All emails have been sent or an attempt has been made for each contact."))
     
@@ -361,14 +370,11 @@ elif st.session_state.page == 'results':
     with col3:
         st.metric(_t("Emails Failed to Send"), st.session_state.sending_summary['failed'])
 
-    st.markdown("---")
-    
-    st.subheader(_t("Sending Log"))
-    log_container = st.container()
-    with log_container:
-        for log_entry in st.session_state.email_sending_status:
-            st.write(log_entry)
+    # Filter for only error logs
+    failed_emails_log = [log for log in st.session_state.email_sending_status if 'error' in log.lower() or 'failed' in log.lower()]
 
-    if st.button(_t("Start New Email Session"), use_container_width=True):
-        reset_state()
-        st.rerun()
+    if failed_emails_log:
+        st.markdown("---")
+        with st.expander(_t("Show logs for failed emails")):
+            for log_entry in failed_emails_log:
+                st.write(log_entry)
