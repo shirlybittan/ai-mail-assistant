@@ -40,6 +40,10 @@ if 'email_sending_status' not in st.session_state:
     st.session_state.email_sending_status = []
 if 'sending_in_progress' not in st.session_state:
     st.session_state.sending_in_progress = False
+if 'file_uploader_key' not in st.session_state:
+    st.session_state.file_uploader_key = 0
+if 'last_uploaded_file_name' not in st.session_state:
+    st.session_state.last_uploaded_file_name = None
 
 # Email generation states
 if 'personalize_emails' not in st.session_state:
@@ -54,7 +58,7 @@ if 'generic_greeting' not in st.session_state:
     st.session_state.generic_greeting = ""
 if 'final_emails_to_send' not in st.session_state:
     st.session_state.final_emails_to_send = []
-    
+
 # Sending results state
 if 'sending_summary' not in st.session_state:
     st.session_state.sending_summary = {
@@ -83,6 +87,8 @@ def reset_state():
         'successful': 0,
         'failed': 0
     }
+    st.session_state.file_uploader_key += 1
+    st.session_state.last_uploaded_file_name = None
 
 
 def generate_email_preview_and_template():
@@ -92,33 +98,29 @@ def generate_email_preview_and_template():
     """
     st.session_state.template_email = None
     st.session_state.email_sending_status = [_t("Generating email template... This may take a moment.")]
-    
+
+    # Correctly initialize the agent with the API key from config
     agent = SmartEmailAgent(openai_api_key=OPENAI_API_KEY)
-    
+
+    # Use the first contact for a personalized preview if personalization is enabled
+    # Otherwise, pass None to generate a template
+    contact_for_generation = st.session_state.contacts[0] if st.session_state.personalize_emails and st.session_state.contacts else None
+
+    # Call the agent's unified method
     template = agent.generate_email(
         prompt=st.session_state.user_prompt,
-        contact_info=None,
+        contact_info=contact_for_generation,
         user_email_context=st.session_state.user_email_context,
         output_language=st.session_state.language
     )
-    
+
     if template["subject"] != "Error":
         st.session_state.template_email = template
         st.session_state.email_sending_status.append(_t("  - Generated template email successfully."))
         
-        preview_subject_text = template['subject']
-        preview_body_text = template['body']
-        
-        if st.session_state.personalize_emails and st.session_state.contacts:
-            first_contact = st.session_state.contacts[0]
-            preview_subject_text = template['subject'].replace("{{Name}}", first_contact.get('name', ''))
-            preview_body_text = template['body'].replace("{{Name}}", first_contact.get('name', ''))
-        elif st.session_state.generic_greeting:
-            greeting = st.session_state.generic_greeting
-            preview_body_text = template['body'].replace("{{Name}}", greeting)
-        
-        st.session_state.template_email['preview_subject'] = preview_subject_text
-        st.session_state.template_email['preview_body'] = preview_body_text
+        # The agent now handles personalization, so we just need to use the output
+        st.session_state.template_email['preview_subject'] = template['subject']
+        st.session_state.template_email['preview_body'] = template['body']
     else:
         st.session_state.email_sending_status.append(_t("  - ERROR: Failed to generate template email. Details: {details}", details=template['body']))
 
@@ -140,6 +142,7 @@ with st.sidebar:
     )
     if st.session_state.language != selected_language:
         st.session_state.language = selected_language
+        set_language(st.session_state.language)
         st.rerun()
         
     st.markdown("---")
@@ -150,7 +153,11 @@ with st.sidebar:
 if st.session_state.page == 'generate':
     st.subheader(_t("1. Email Generation"))
     
-    uploaded_file = st.file_uploader(_t("Upload an Excel file with contacts (.xlsx)"), type=["xlsx", "xls"], key="file_uploader")
+    uploaded_file = st.file_uploader(
+        _t("Upload an Excel file with contacts (.xlsx)"),
+        type=["xlsx", "xls"],
+        key=f"file_uploader_{st.session_state.file_uploader_key}"
+    )
 
     if uploaded_file and uploaded_file.name != st.session_state.get('last_uploaded_file_name'):
         st.session_state.last_uploaded_file_name = uploaded_file.name
@@ -233,12 +240,12 @@ elif st.session_state.page == 'preview':
         if st.session_state.template_email:
             st.session_state.editable_preview_subject = st.text_input(
                 _t("Subject"),
-                value=st.session_state.template_email.get("preview_subject", ""),
+                value=st.session_state.template_email.get("subject", ""),
                 key="preview_subject"
             )
             st.session_state.editable_preview_body = st.text_area(
                 _t("Body"),
-                value=st.session_state.template_email.get("preview_body", ""),
+                value=st.session_state.template_email.get("body", ""),
                 height=400,
                 key="preview_body"
             )
@@ -263,15 +270,21 @@ elif st.session_state.page == 'preview':
             recipient_name = contact.get('name', '{{Name}}')
             recipient_email = contact['email']
             
+            # The new agent handles personalization, so we call it for each contact if needed
             if st.session_state.personalize_emails:
-                final_name = recipient_name
+                agent = SmartEmailAgent(openai_api_key=OPENAI_API_KEY)
+                personalized_email = agent.generate_email(
+                    prompt=st.session_state.user_prompt,
+                    contact_info=contact,
+                    user_email_context=st.session_state.user_email_context,
+                    output_language=st.session_state.language
+                )
+                final_subject = personalized_email.get("subject")
+                final_body = personalized_email.get("body")
             else:
-                final_name = st.session_state.generic_greeting if st.session_state.generic_greeting else recipient_name
-
-            final_subject = template_subject.replace("{{Name}}", final_name)
-            final_body = template_body.replace("{{Name}}", final_name)
-            final_body = final_body.replace("{{Email}}", recipient_email)
-
+                final_subject = template_subject.replace("{{Name}}", st.session_state.generic_greeting if st.session_state.generic_greeting else recipient_name)
+                final_body = template_body.replace("{{Name}}", st.session_state.generic_greeting if st.session_state.generic_greeting else recipient_name)
+            
             st.session_state.final_emails_to_send.append({
                 "recipient_email": recipient_email,
                 "recipient_name": recipient_name,
@@ -335,7 +348,6 @@ elif st.session_state.page == 'preview':
                 st.session_state.email_sending_status.append(_t("ERROR: Could not clean up temporary attachments: ") + str(cleanup_e))
                 print(f"ERROR: streamlit_app.py: Could not clean up temporary directory {temp_dir}: {cleanup_e}")
 
-        # Update summary and move to results page
         st.session_state.sending_summary = {
             'total_contacts': len(st.session_state.contacts),
             'successful': total_success,
@@ -344,10 +356,10 @@ elif st.session_state.page == 'preview':
         st.session_state.page = 'results'
         st.rerun()
 
+
 elif st.session_state.page == 'results':
     st.subheader(_t("3. Sending Results"))
     
-    # Place the "Start New Email Session" button at the top, centered.
     cols = st.columns(3)
     with cols[1]:
         if st.button(_t("Start New Email Session"), use_container_width=True):
@@ -370,7 +382,6 @@ elif st.session_state.page == 'results':
     with col3:
         st.metric(_t("Emails Failed to Send"), st.session_state.sending_summary['failed'])
 
-    # Filter for only error logs
     failed_emails_log = [log for log in st.session_state.email_sending_status if 'error' in log.lower() or 'failed' in log.lower()]
 
     if failed_emails_log:
