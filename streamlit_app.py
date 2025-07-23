@@ -3,7 +3,7 @@
 import streamlit as st
 import pandas as pd
 from data_handler import load_contacts_from_excel
-from email_agent import SmartEmailAgent # NEW: Use the unified email_agent
+from email_agent import SmartEmailAgent # Use the unified email_agent
 from email_tool import send_email_message
 from config import SENDER_CREDENTIALS, OPENAI_API_KEY, SENDER_EMAIL, SENDER_PASSWORD, FAILED_EMAILS_LOG_PATH
 import tempfile
@@ -97,7 +97,7 @@ def generate_email_previews():
             if contact['email'] not in st.session_state.generated_personalized_emails:
                 st.session_state.email_sending_status.append(_t(f"Generating personalized email for {contact['name']} ({contact['email']})..."))
                 
-                # NEW: Call the unified generate_email method with contact info
+                # Call the unified generate_email method with contact info
                 preview = agent.generate_email(
                     prompt=st.session_state.user_prompt,
                     contact_info=contact,
@@ -114,7 +114,7 @@ def generate_email_previews():
         # Generate a single template email
         st.session_state.email_sending_status.append(_t("Generating a general email template..."))
         
-        # NEW: Call the unified generate_email method without contact info
+        # Call the unified generate_email method without contact info
         template = agent.generate_email(
             prompt=st.session_state.user_prompt,
             contact_info=None,
@@ -147,7 +147,7 @@ with st.sidebar:
     )
     if st.session_state.language != selected_language:
         st.session_state.language = selected_language
-        st.experimental_rerun()
+        st.rerun() # FIXED: Changed from st.experimental_rerun()
         
     st.markdown("---")
     st.markdown(_t("This app allows you to send mass personalized emails using an AI agent."))
@@ -170,7 +170,7 @@ if st.session_state.page == 'generate':
             for issue in st.session_state.contact_issues:
                 st.warning(issue)
             
-        st.experimental_rerun()
+        st.rerun() # FIXED: Changed from st.experimental_rerun()
     elif 'last_uploaded_file_name' in st.session_state and st.session_state.contacts:
         st.success(_t(f"Using previously loaded contacts: {len(st.session_state.contacts)} valid contacts found."))
         
@@ -206,6 +206,7 @@ if st.session_state.page == 'generate':
     
     st.markdown("---")
     
+    # Attachments
     st.subheader(_t("Attachments (Optional)"))
     uploaded_attachments = st.file_uploader(_t("Upload files to attach to all emails"), type=None, accept_multiple_files=True, key="attachment_uploader")
     
@@ -373,4 +374,4 @@ elif st.session_state.page == 'preview':
         if st.button(_t("Start New Email Session"), use_container_width=True):
             # Reset all relevant session state variables for a fresh start
             reset_state()
-            st.experimental_rerun()
+            st.rerun() # FIXED: Changed from st.experimental_rerun()
