@@ -22,14 +22,12 @@ selected_sender_email = SENDER_EMAIL
 selected_sender_password = SENDER_PASSWORD
 
 # --- Session State Initialization ---
-# Ensure language is set BEFORE the selectbox is rendered
 if 'language' not in st.session_state:
-    st.session_state.language = "fr" # Default language set to French
-
-set_language(st.session_state.language) # Set the global language helper based on session state
+    st.session_state.language = "fr"
+set_language(st.session_state.language)
 
 if 'page' not in st.session_state:
-    st.session_state.page = 'generate' # Initial page
+    st.session_state.page = 'generate'
 
 # Core data states
 if 'contacts' not in st.session_state:
@@ -44,11 +42,10 @@ if 'sending_in_progress' not in st.session_state:
     st.session_state.sending_in_progress = False
 
 # Email generation states
-# UNCHECKED BY DEFAULT: The 'personalize_emails' state is now False by default
 if 'personalize_emails' not in st.session_state:
     st.session_state.personalize_emails = False
 if 'template_email' not in st.session_state:
-    st.session_state.template_email = None # Store the general template email
+    st.session_state.template_email = None
 if 'user_prompt' not in st.session_state:
     st.session_state.user_prompt = ""
 if 'user_email_context' not in st.session_state:
@@ -57,6 +54,14 @@ if 'generic_greeting' not in st.session_state:
     st.session_state.generic_greeting = ""
 if 'final_emails_to_send' not in st.session_state:
     st.session_state.final_emails_to_send = []
+    
+# Sending results state
+if 'sending_summary' not in st.session_state:
+    st.session_state.sending_summary = {
+        'total_contacts': 0,
+        'successful': 0,
+        'failed': 0
+    }
 
 
 # --- Functions ---
@@ -67,24 +72,29 @@ def reset_state():
     st.session_state.uploaded_attachments = []
     st.session_state.email_sending_status = []
     st.session_state.template_email = None
-    st.session_state.personalize_emails = False # Reset to False
+    st.session_state.personalize_emails = False
     st.session_state.user_prompt = ""
     st.session_state.user_email_context = ""
     st.session_state.generic_greeting = ""
     st.session_state.page = 'generate'
     st.session_state.final_emails_to_send = []
+    st.session_state.sending_summary = {
+        'total_contacts': 0,
+        'successful': 0,
+        'failed': 0
+    }
+
 
 def generate_email_preview_and_template():
     """
     Generates a single template email and a personalized preview for the first contact
     if personalization is enabled.
     """
-    st.session_state.template_email = None # Clear previous template
+    st.session_state.template_email = None
     st.session_state.email_sending_status = [_t("Generating email template... This may take a moment.")]
     
     agent = SmartEmailAgent(openai_api_key=OPENAI_API_KEY)
     
-    # Always generate a base template first (without personalization)
     template = agent.generate_email(
         prompt=st.session_state.user_prompt,
         contact_info=None,
@@ -96,20 +106,22 @@ def generate_email_preview_and_template():
         st.session_state.template_email = template
         st.session_state.email_sending_status.append(_t("  - Generated template email successfully."))
         
-        # If personalization is enabled, create a preview for the first contact
+        # Determine the preview text based on personalization and available contacts
+        preview_subject_text = template['subject']
+        preview_body_text = template['body']
+        
         if st.session_state.personalize_emails and st.session_state.contacts:
             first_contact = st.session_state.contacts[0]
-            preview_body = template['body'].replace("{{Name}}", first_contact.get('name', ''))
-            st.session_state.template_email['preview_subject'] = template['subject'].replace("{{Name}}", first_contact.get('name', ''))
-            st.session_state.template_email['preview_body'] = preview_body
-        else:
-            # If not personalized, use the generic greeting placeholder for the preview
-            greeting = st.session_state.generic_greeting if st.session_state.generic_greeting else "{{Name}}"
-            preview_body = template['body'].replace("{{Name}}", greeting)
-            st.session_state.template_email['preview_subject'] = template['subject']
-            st.session_state.template_email['preview_body'] = preview_body
+            preview_subject_text = template['subject'].replace("{{Name}}", first_contact.get('name', ''))
+            preview_body_text = template['body'].replace("{{Name}}", first_contact.get('name', ''))
+        elif st.session_state.generic_greeting:
+            greeting = st.session_state.generic_greeting
+            preview_body_text = template['body'].replace("{{Name}}", greeting)
+        
+        st.session_state.template_email['preview_subject'] = preview_subject_text
+        st.session_state.template_email['preview_body'] = preview_body_text
     else:
-        st.session_state.email_sending_status.append(_t(f"  - ERROR: Failed to generate template email. Details: {template['body']}"))
+        st.session_state.email_sending_status.append(_t("  - ERROR: Failed to generate template email. Details: {details}", details=template['body']))
 
     st.session_state.page = 'preview'
 
@@ -117,7 +129,6 @@ def generate_email_preview_and_template():
 # --- UI LAYOUT ---
 st.header(_t("AI Email Assistant"))
 
-# Language selection on the sidebar
 with st.sidebar:
     st.header(_t("Settings"))
     
@@ -136,11 +147,10 @@ with st.sidebar:
     st.markdown(_t("This app allows you to send mass personalized emails using an AI agent."))
 
 
-# --- Page Navigation ---
+# --- Page Navigation Logic ---
 if st.session_state.page == 'generate':
     st.subheader(_t("1. Email Generation"))
     
-    # File uploader for contacts
     uploaded_file = st.file_uploader(_t("Upload an Excel file with contacts (.xlsx)"), type=["xlsx", "xls"], key="file_uploader")
 
     if uploaded_file and uploaded_file.name != st.session_state.get('last_uploaded_file_name'):
@@ -148,16 +158,15 @@ if st.session_state.page == 'generate':
         st.session_state.contacts, st.session_state.contact_issues = load_contacts_from_excel(uploaded_file)
         
         if st.session_state.contacts:
-            st.success(_t(f"Successfully loaded {len(st.session_state.contacts)} valid contacts."))
+            st.success(_t("Successfully loaded {count} valid contacts.", count=len(st.session_state.contacts)))
         if st.session_state.contact_issues:
             for issue in st.session_state.contact_issues:
                 st.warning(issue)
             
         st.rerun()
     elif 'last_uploaded_file_name' in st.session_state and st.session_state.contacts:
-        st.success(_t(f"Using previously loaded contacts: {len(st.session_state.contacts)} valid contacts found."))
+        st.success(_t("Using previously loaded contacts: {count} valid contacts found.", count=len(st.session_state.contacts)))
         
-        # Display issues from previous upload, if any
         if st.session_state.contact_issues:
             st.warning(_t("Some contacts had issues and were skipped."))
             with st.expander(_t("Show skipped contacts")):
@@ -166,15 +175,12 @@ if st.session_state.page == 'generate':
 
     st.markdown("---")
     
-    # Email details
-    # UNCHECKED BY DEFAULT: Set the value of the checkbox to the session state variable
     st.session_state.personalize_emails = st.checkbox(
         _t("Personalize emails for each contact?"),
         value=st.session_state.personalize_emails,
         key="personalize_checkbox"
     )
     
-    # SHOWS A CONDITIONAL INPUT: Only show this if personalization is off
     if not st.session_state.personalize_emails:
         st.session_state.generic_greeting = st.text_input(
             _t("Generic Greeting Placeholder (e.g., 'Dear Friends')"),
@@ -202,25 +208,19 @@ if st.session_state.page == 'generate':
     
     st.markdown("---")
     
-    # Attachments
     st.subheader(_t("Attachments (Optional)"))
     uploaded_attachments = st.file_uploader(_t("Upload files to attach to all emails"), type=None, accept_multiple_files=True, key="attachment_uploader")
     
     if uploaded_attachments:
         st.session_state.uploaded_attachments = uploaded_attachments
-        st.info(_t(f"You have uploaded {len(st.session_state.uploaded_attachments)} attachments."))
+        st.info(_t("You have uploaded {count} attachments.", count=len(st.session_state.uploaded_attachments)))
     else:
         st.session_state.uploaded_attachments = []
         
     st.markdown("---")
     
-    # Action buttons
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button(_t("Generate Previews"), use_container_width=True, disabled=not st.session_state.contacts or not st.session_state.user_prompt):
-            generate_email_preview_and_template()
-
-    # REMOVED: Removed the 'Start Over' button from this page
+    if st.button(_t("Generate Previews"), use_container_width=True, disabled=not st.session_state.contacts or not st.session_state.user_prompt):
+        generate_email_preview_and_template()
 
 
 elif st.session_state.page == 'preview':
@@ -253,33 +253,25 @@ elif st.session_state.page == 'preview':
         
     st.markdown("---")
     
-    # --- Send Emails Action ---
     if st.button(_t("Send All Emails"), use_container_width=True, disabled=st.session_state.sending_in_progress):
-        
-        # Disable the button to prevent multiple clicks
         st.session_state.sending_in_progress = True
         
-        # Prepare the final emails to send
-        st.session_state.final_emails_to_send = []
-        
-        # Use the edited subject and body as the new master template
         template_subject = st.session_state.editable_preview_subject
         template_body = st.session_state.editable_preview_body
         
+        st.session_state.final_emails_to_send = []
         for contact in st.session_state.contacts:
             recipient_name = contact.get('name', '{{Name}}')
             recipient_email = contact['email']
             
-            # Use the correct name or generic greeting
             if st.session_state.personalize_emails:
                 final_name = recipient_name
             else:
                 final_name = st.session_state.generic_greeting if st.session_state.generic_greeting else recipient_name
 
-            # Replace placeholders in the master template
             final_subject = template_subject.replace("{{Name}}", final_name)
             final_body = template_body.replace("{{Name}}", final_name)
-            final_body = final_body.replace("{{Email}}", recipient_email) # Always good to have this as a fallback
+            final_body = final_body.replace("{{Email}}", recipient_email)
 
             st.session_state.final_emails_to_send.append({
                 "recipient_email": recipient_email,
@@ -288,14 +280,14 @@ elif st.session_state.page == 'preview':
                 "body": final_body,
                 "attachments": st.session_state.uploaded_attachments
             })
-
         
-        # Proceed with sending emails
         st.session_state.email_sending_status.append(_t("Email sending process initiated..."))
         
-        # Use a temporary directory for attachments
         temp_dir = tempfile.mkdtemp()
         attachment_paths = []
+        total_success = 0
+        total_failed = 0
+        
         try:
             for uploaded_file in st.session_state.uploaded_attachments:
                 file_path = os.path.join(temp_dir, uploaded_file.name)
@@ -311,10 +303,11 @@ elif st.session_state.page == 'preview':
                 subject = email_data['subject']
                 body = email_data['body']
                 
-                status_msg = _t(f"--- [{i+1}/{total_emails}] Processing contact: {recipient_name} ({recipient_email}) ---")
+                status_msg = _t("--- [{current}/{total}] Processing contact: {name} ({email}) ---",
+                                current=i+1, total=total_emails, name=recipient_name, email=recipient_email)
                 st.session_state.email_sending_status.append(status_msg)
                 
-                st.session_state.email_sending_status.append(_t(f"  Attempting Email for {recipient_name}..."))
+                st.session_state.email_sending_status.append(_t("  Attempting Email for {name}...", name=recipient_name))
                 result = send_email_message(
                     sender_email=selected_sender_email,
                     sender_password=selected_sender_password,
@@ -326,27 +319,56 @@ elif st.session_state.page == 'preview':
                 )
 
                 if result['status'] == 'success':
-                    st.session_state.email_sending_status.append(_t(f"    - Email: success - Email sent to {recipient_email} successfully."))
+                    st.session_state.email_sending_status.append(_t("    - Email: success - Email sent to {email} successfully.", email=recipient_email))
+                    total_success += 1
                 else:
-                    st.session_state.email_sending_status.append(_t(f"    - Email: error - Failed to send to {recipient_email}. Details: {result['message']}"))
+                    st.session_state.email_sending_status.append(_t("    - Email: error - Failed to send to {email}. Details: {details}", email=recipient_email, details=result['message']))
+                    total_failed += 1
             
             st.session_state.email_sending_status.append(_t("--- Email sending process complete ---"))
             
         finally:
             st.session_state.sending_in_progress = False
-            # Clean up temporary directory
             try:
                 if os.path.exists(temp_dir):
                     shutil.rmtree(temp_dir)
             except Exception as cleanup_e:
-                st.session_state.email_sending_status.append(f"{_t('ERROR: Could not clean up temporary attachments: ')}{cleanup_e}")
+                st.session_state.email_sending_status.append(_t("ERROR: Could not clean up temporary attachments: ") + str(cleanup_e))
                 print(f"ERROR: streamlit_app.py: Could not clean up temporary directory {temp_dir}: {cleanup_e}")
 
-        # Final display of the complete log
-        st.empty().write("".join(st.session_state.email_sending_status))
+        # Update summary and move to results page
+        st.session_state.sending_summary = {
+            'total_contacts': len(st.session_state.contacts),
+            'successful': total_success,
+            'failed': total_failed
+        }
+        st.session_state.page = 'results'
+        st.rerun()
 
-    if not st.session_state.sending_in_progress: # Only show 'Start New' button when sending is done
-        if st.button(_t("Start New Email Session"), use_container_width=True):
-            # Reset all relevant session state variables for a fresh start
-            reset_state()
-            st.rerun()
+elif st.session_state.page == 'results':
+    st.subheader(_t("3. Sending Results"))
+    st.success(_t("Sending complete"))
+    st.write(_t("All emails have been sent or an attempt has been made for each contact."))
+    
+    st.markdown("---")
+    
+    st.subheader(_t("Summary"))
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric(_t("Total Contacts"), st.session_state.sending_summary['total_contacts'])
+    with col2:
+        st.metric(_t("Emails Successfully Sent"), st.session_state.sending_summary['successful'])
+    with col3:
+        st.metric(_t("Emails Failed to Send"), st.session_state.sending_summary['failed'])
+
+    st.markdown("---")
+    
+    st.subheader(_t("Sending Log"))
+    log_container = st.container()
+    with log_container:
+        for log_entry in st.session_state.email_sending_status:
+            st.write(log_entry)
+
+    if st.button(_t("Start New Email Session"), use_container_width=True):
+        reset_state()
+        st.rerun()
