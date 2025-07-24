@@ -3,7 +3,7 @@
 import streamlit as st
 import pandas as pd
 from data_handler import load_contacts_from_excel
-from email_agent import SmartEmailAgent # Updated import
+from email_agent import SmartEmailAgent
 from email_tool import send_email_message
 from config import SENDER_CREDENTIALS, OPENAI_API_KEY, SENDER_EMAIL, SENDER_PASSWORD, FAILED_EMAILS_LOG_PATH
 import tempfile
@@ -383,10 +383,15 @@ elif st.session_state.page == 'results':
         with col3:
             st.metric(_t("Emails Failed to Send"), st.session_state.sending_summary['failed'])
 
+        st.markdown("---")
+        st.subheader(_t("Activity Log"))
+        # Display the full log on the results page
+        for log_entry in st.session_state.email_sending_status:
+            st.write(log_entry)
+
         failed_emails_log = [log for log in st.session_state.email_sending_status if 'error' in log.lower() or 'failed' in log.lower()]
 
         if failed_emails_log:
-            st.markdown("---")
             with st.expander(_t("Show logs for failed emails")):
                 for log_entry in failed_emails_log:
                     st.write(log_entry)
