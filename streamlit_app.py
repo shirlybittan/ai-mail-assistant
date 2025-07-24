@@ -64,6 +64,10 @@ if 'editable_preview_subject' not in st.session_state:
     st.session_state.editable_preview_subject = ""
 if 'editable_preview_body' not in st.session_state:
     st.session_state.editable_preview_body = ""
+# UI state for preview page
+if 'show_live_preview' not in st.session_state:
+    st.session_state.show_live_preview = False
+
 
 # Sending results state
 if 'sending_summary' not in st.session_state:
@@ -89,6 +93,7 @@ def reset_state():
     st.session_state.generic_greeting = ""
     st.session_state.editable_preview_subject = ""
     st.session_state.editable_preview_body = ""
+    st.session_state.show_live_preview = False
     st.session_state.page = 'generate'
     st.session_state.final_emails_to_send = []
     st.session_state.sending_summary = {
@@ -241,39 +246,18 @@ if st.session_state.page == 'generate':
         st.markdown("---")
         if st.button(_t("Proceed to Preview"), use_container_width=True):
             st.session_state.page = 'preview'
+            # When proceeding, hide the preview by default on the next page
+            st.session_state.show_live_preview = False
             st.rerun()
 
 
 elif st.session_state.page == 'preview':
     st.subheader(_t("2. Aperçu et envoi"))
-    st.info(_t("Review the generated email template below. You can edit the subject and body before sending."))
+    st.info(_t("Review and edit the generated email template below. Click the preview button to see how it looks for the first contact."))
 
     if st.session_state.template_email and st.session_state.contacts:
         
-        # --- NEW: DYNAMIC PREVIEW SECTION ---
-        st.subheader(_t("Live Preview (Example for First Contact)"))
-        
-        first_contact = st.session_state.contacts[0]
-        preview_subject = st.session_state.editable_preview_subject
-        preview_body = st.session_state.editable_preview_body
-
-        if st.session_state.personalize_emails:
-            recipient_name = first_contact.get('name', 'Contact')
-            preview_subject = preview_subject.replace("{{Name}}", recipient_name)
-            preview_body = preview_body.replace("{{Name}}", recipient_name)
-        elif st.session_state.generic_greeting:
-            preview_subject = preview_subject.replace("{{Name}}", st.session_state.generic_greeting)
-            preview_body = preview_body.replace("{{Name}}", st.session_state.generic_greeting)
-        
-        preview_body_html = preview_body.replace('\n', '<br>')
-
-        with st.container(border=True):
-            st.markdown(f"**{_t('Subject')}:** {preview_subject}")
-            st.markdown("---")
-            st.markdown(preview_body_html, unsafe_allow_html=True)
-        # --- END OF NEW SECTION ---
-
-        st.markdown("---")
+        # --- REWORK: EDITABLE TEMPLATE FIRST ---
         st.subheader(_t("Edit Template"))
         
         st.session_state.editable_preview_subject = st.text_input(
@@ -287,6 +271,34 @@ elif st.session_state.page == 'preview':
             height=300,
             key="preview_body_page_2"
         )
+        
+        # --- REWORK: ON-DEMAND PREVIEW BUTTON ---
+        if st.button(_t("Show/Update Preview"), use_container_width=True):
+            st.session_state.show_live_preview = True
+
+        # --- REWORK: CONDITIONAL PREVIEW DISPLAY ---
+        if st.session_state.show_live_preview:
+            st.subheader(_t("Live Preview (Example for First Contact)"))
+            
+            first_contact = st.session_state.contacts[0]
+            preview_subject = st.session_state.editable_preview_subject
+            preview_body = st.session_state.editable_preview_body
+
+            if st.session_state.personalize_emails:
+                recipient_name = first_contact.get('name', 'Contact')
+                preview_subject = preview_subject.replace("{{Name}}", recipient_name)
+                preview_body = preview_body.replace("{{Name}}", recipient_name)
+            elif st.session_state.generic_greeting:
+                preview_subject = preview_subject.replace("{{Name}}", st.session_state.generic_greeting)
+                preview_body = preview_body.replace("{{Name}}", st.session_state.generic_greeting)
+            
+            # Robust newline replacement for display
+            preview_body_html = preview_body.replace('\r\n', '<br>').replace('\n', '<br>')
+
+            with st.container(border=True):
+                st.markdown(f"**{_t('Subject')}:** {preview_subject}")
+                st.markdown("---")
+                st.markdown(preview_body_html, unsafe_allow_html=True)
         
         st.markdown("---")
         
@@ -326,8 +338,8 @@ elif st.session_state.page == 'preview':
                 final_subject = final_subject.replace("{{Email}}", recipient_email)
                 final_body = final_body.replace("{{Email}}", recipient_email)
 
-                # --- FIX: Convert newlines to <br> for HTML email ---
-                final_body_html = final_body.replace('\n', '<br>')
+                # --- FIX: Robustly convert all newline types to <br> for HTML email ---
+                final_body_html = final_body.replace('\r\n', '<br>').replace('\n', '<br>')
                 
                 st.session_state.final_emails_to_send.append({
                     "recipient_email": recipient_email,

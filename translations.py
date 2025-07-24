@@ -34,7 +34,6 @@ TRANSLATIONS = {
         "Show skipped contacts": "Show skipped contacts",
         "Using previously loaded contacts: {count} valid contacts found.": "Using previously loaded contacts: {count} valid contacts found.",
         "Personalize emails for each contact?": "Personalize emails for each contact?",
-        # --- FIX: Changed placeholder text for clarity ---
         "Generic Greeting Placeholder (e.g., 'Dear Friends')": "Placeholder for {{Name}} (e.g., 'Friends', 'Valued Customers')",
         "Enter your instruction for the AI agent:": "Enter your instruction for the AI agent:",
         "AI Instruction": "AI Instruction",
@@ -53,10 +52,11 @@ TRANSLATIONS = {
         "ERROR: Failed to generate template email. Details: {details}": "ERROR: Failed to generate template email. Details: {details}",
         
         "2. Aperçu et envoi": "2. Preview and Send",
-        "Review the generated email template below. You can edit the subject and body before sending.": "Review the generated email template below. You can edit the subject and body before sending.",
+        "Review and edit the generated email template below. Click the preview button to see how it looks for the first contact.": "Review and edit the generated email template below. Click the preview button to see how it looks for the first contact.",
         "Email Preview": "Email Preview",
         "Live Preview (Example for First Contact)": "Live Preview (Example for First Contact)",
         "Edit Template": "Edit Template",
+        "Show/Update Preview": "Show/Update Preview",
         "Preview Subject": "Preview Subject",
         "Preview Body": "Preview Body",
         "Confirm Send": "Confirm Send",
@@ -107,7 +107,6 @@ TRANSLATIONS = {
         "Show skipped contacts": "Afficher les contacts ignorés",
         "Using previously loaded contacts: {count} valid contacts found.": "Utilisation des contacts précédemment chargés : {count} contacts valides trouvés.",
         "Personalize emails for each contact?": "Personnaliser les e-mails pour chaque contact ?",
-        # --- FIX: Changed placeholder text for clarity ---
         "Generic Greeting Placeholder (e.g., 'Dear Friends')": "Remplaçant pour {{Name}} (ex: 'Chers Amis', 'Clients')",
         "Enter your instruction for the AI agent:": "Saisissez votre instruction pour l'agent IA :",
         "AI Instruction": "Instruction pour l'IA",
@@ -126,10 +125,11 @@ TRANSLATIONS = {
         "ERROR: Failed to generate template email. Details: {details}": "ERREUR : Échec de la génération du modèle d'e-mail. Détails : {details}",
 
         "2. Aperçu et envoi": "2. Aperçu et envoi",
-        "Review the generated email template below. You can edit the subject and body before sending.": "Vérifiez le modèle d'e-mail ci-dessous. Vous pouvez modifier le sujet et le corps avant l'envoi.",
+        "Review and edit the generated email template below. Click the preview button to see how it looks for the first contact.": "Vérifiez et modifiez le modèle d'e-mail ci-dessous. Cliquez sur le bouton d'aperçu pour voir à quoi il ressemble pour le premier contact.",
         "Email Preview": "Aperçu de l'e-mail",
         "Live Preview (Example for First Contact)": "Aperçu en direct (Exemple pour le premier contact)",
         "Edit Template": "Modifier le modèle",
+        "Show/Update Preview": "Voir l'aperçu / Mettre à jour",
         "Preview Subject": "Objet de l'aperçu",
         "Preview Body": "Corps de l'aperçu",
         "Confirm Send": "Confirmer l'envoi",
