@@ -148,7 +148,7 @@ with st.sidebar:
 
 # --- Page Navigation Logic ---
 if st.session_state.page == 'generate':
-    st.subheader(_t("1. Génération d'emails"))
+    st.subheader(_t("1. Email Generation"))
     
     uploaded_file = st.file_uploader(
         _t("Upload an Excel file with contacts (.xlsx)"),
@@ -248,25 +248,18 @@ elif st.session_state.page == 'preview':
         recipient_name = first_contact.get('name', 'Contact')
         recipient_email = first_contact['email']
         
-        template_subject = st.session_state.editable_preview_subject
-        template_body = st.session_state.editable_preview_body
-        
-        # Apply personalization to the preview
-        preview_subject = template_subject
-        preview_body = template_body
-        
-        if st.session_state.personalize_emails:
-            preview_subject = preview_subject.replace("{{Name}}", recipient_name)
-            preview_body = preview_body.replace("{{Name}}", recipient_name)
-        elif st.session_state.generic_greeting:
-            preview_subject = preview_subject.replace("{{Name}}", st.session_state.generic_greeting)
-            preview_body = preview_body.replace("{{Name}}", st.session_state.generic_greeting)
-        
-        preview_subject = preview_subject.replace("{{Email}}", recipient_email)
-        preview_body = preview_body.replace("{{Email}}", recipient_email)
-
-        st.text_input(_t("Preview Subject"), value=preview_subject, disabled=True)
-        st.text_area(_t("Preview Body"), value=preview_body, height=300, disabled=True)
+        # User can now edit subject and body directly on this page
+        st.session_state.editable_preview_subject = st.text_input(
+            _t("Preview Subject"),
+            value=st.session_state.editable_preview_subject,
+            key="preview_subject_page_2"
+        )
+        st.session_state.editable_preview_body = st.text_area(
+            _t("Preview Body"),
+            value=st.session_state.editable_preview_body,
+            height=300,
+            key="preview_body_page_2"
+        )
         
         st.markdown("---")
         
@@ -396,10 +389,9 @@ elif st.session_state.page == 'results':
         else:
             st.warning(_t("Sending complete with errors."))
             st.write(_t("Some emails failed to send. Please check the log below for details."))
-
+        
         st.markdown("---")
         
-        st.subheader(_t("Summary"))
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric(_t("Total Contacts"), st.session_state.sending_summary['total_contacts'])
@@ -409,6 +401,7 @@ elif st.session_state.page == 'results':
             st.metric(_t("Emails Failed to Send"), st.session_state.sending_summary['failed'])
 
         if st.session_state.sending_summary['failed'] > 0:
+            st.markdown("---")
             with st.expander(_t("Show Activity Log and Errors")):
                 for log_entry in st.session_state.email_sending_status:
                     st.write(log_entry)

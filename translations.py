@@ -1,5 +1,3 @@
-# translations.py
-
 LANGUAGES = {
     "en": "English",
     "fr": "Français",
@@ -10,9 +8,23 @@ LANGUAGES = {
 TRANSLATIONS = {
     "en": {
         "AI Email Assistant": "AI Email Assistant",
-        "Settings": "Settings",
+        "Welcome to the AI Email Assistant!": "Welcome to the AI Email Assistant!",
         "Select your language": "Select your language",
-        "This app allows you to send mass personalized emails using an AI agent.": "This app allows you to send mass personalized emails using an AI agent.",
+        "Generate Email": "Generate Email",
+        "Compose your email details below.": "Compose your email details below.",
+        "Recipient": "Recipient",
+        "Subject": "Subject",
+        "Body": "Body",
+        "Sender": "Sender",
+        "Clear Form": "Clear Form",
+        "Your email has been generated!": "Your email has been generated!",
+        "Error generating email. Please try again.": "Error generating email. Please try again.",
+        "Recipient, Subject, and Body cannot be empty.": "Recipient, Subject, and Body cannot be empty.",
+        "Enter a recipient": "Enter a recipient",
+        "Enter a subject": "Enter a subject",
+        "Enter email body": "Enter email body",
+        "Enter sender name or email": "Enter sender name or email",
+        # New Translations
         "1. Email Generation": "1. Email Generation",
         "Upload an Excel file with contacts (.xlsx)": "Upload an Excel file with contacts (.xlsx)",
         "Successfully loaded {count} valid contacts.": "Successfully loaded {count} valid contacts.",
@@ -30,19 +42,23 @@ TRANSLATIONS = {
         "Attachments (Optional)": "Attachments (Optional)",
         "Upload files to attach to all emails": "Upload files to attach to all emails",
         "You have uploaded {count} attachments.": "You have uploaded {count} attachments.",
-        "Generate Previews": "Generate Previews",
-        "2. Review and Send Emails": "2. Review and Send Emails",
-        "Review the generated email template below. You can edit the subject and body before sending.": "Review the generated email template below. You can edit the subject and body before sending.",
-        "Email Preview": "Email Preview",
-        "Activity Log": "Activity Log",
+        "No attachments uploaded.": "No attachments uploaded.",
+        "Generate Email": "Generate Email",
+        "Generated Email Template": "Generated Email Template",
         "Subject": "Subject",
         "Body": "Body",
-        "Send All Emails": "Send All Emails",
-        "Start New Email Session": "Start New Email Session",
+        "Proceed to Preview": "Proceed to Preview",
         "Generating email template... This may take a moment.": "Generating email template... This may take a moment.",
-        "  - Generated template email successfully.": "  - Generated template email successfully.",
-        "  - ERROR: Failed to generate template email. Details: {details}": "  - ERROR: Failed to generate template email. Details: {details}",
-        "--- [1/4] Processing contact: bittanshirly Smith (bittanshirly@gmail.com) ---": "--- [1/4] Processing contact: bittanshirly Smith (bittanshirly@gmail.com) ---",
+        "Template email generated successfully!": "Template email generated successfully!",
+        "ERROR: Failed to generate template email. Details: {details}": "ERROR: Failed to generate template email. Details: {details}",
+        
+        "2. Aperçu et envoi": "2. Preview and Send",
+        "Review the generated email template below. You can edit the subject and body before sending.": "Review the generated email template below. You can edit the subject and body before sending.",
+        "Email Preview": "Email Preview",
+        "Preview Subject": "Preview Subject",
+        "Preview Body": "Preview Body",
+        "Confirm Send": "Confirm Send",
+        "Preparing emails for sending...": "Preparing emails for sending...",
         "Email sending process initiated...": "Email sending process initiated...",
         "--- [{current}/{total}] Processing contact: {name} ({email}) ---": "--- [{current}/{total}] Processing contact: {name} ({email}) ---",
         "  Attempting Email for {name}...": "  Attempting Email for {name}...",
@@ -50,73 +66,91 @@ TRANSLATIONS = {
         "    - Email: error - Failed to send to {email}. Details: {details}": "    - Email: error - Failed to send to {email}. Details: {details}",
         "--- Email sending process complete ---": "--- Email sending process complete ---",
         "ERROR: Could not clean up temporary attachments: ": "ERROR: Could not clean up temporary attachments: ",
-        "3. Sending Results": "3. Sending Results",
-        "Email sending is complete!": "Email sending is complete!",
-        "Total Emails Sent": "Total Emails Sent",
+
+        "3. Résultats d'envoi": "3. Sending Results",
+        "Start New Email Session": "Start New Email Session",
+        "All emails sent successfully!": "All emails sent successfully!",
+        "All {count} emails were sent without any issues.": "All {count} emails were sent without any issues.",
+        "Sending complete with errors.": "Sending complete with errors.",
+        "Some emails failed to send. Please check the log below for details.": "Some emails failed to send. Please check the log below for details.",
+        "Summary": "Summary",
+        "Total Contacts": "Total Contacts",
         "Emails Successfully Sent": "Emails Successfully Sent",
         "Emails Failed to Send": "Emails Failed to Send",
-        "A detailed log has been recorded below.": "A detailed log has been recorded below.",
-        "Generation Log": "Generation Log",
-        # New strings for the results page
-        "Sending complete": "Sending complete",
-        "All emails have been sent or an attempt has been made for each contact.": "All emails have been sent or an attempt has been made for each contact.",
-        "Sending Log": "Sending Log",
-        "Total Contacts": "Total Contacts",
-        "This app has encountered an error.": "This app has encountered an error.",
+        "Show Activity Log and Errors": "Show Activity Log and Errors"
     },
     "fr": {
         "AI Email Assistant": "Assistant d'E-mail IA",
-        "Settings": "Paramètres",
+        "Welcome to the AI Email Assistant!": "Bienvenue dans l'Assistant d'E-mail IA !",
         "Select your language": "Sélectionnez votre langue",
-        "This app allows you to send mass personalized emails using an AI agent.": "Cette application vous permet d'envoyer des e-mails personnalisés en masse à l'aide d'un agent IA.",
-        "1. Email Generation": "1. Génération d'E-mail",
-        "Upload an Excel file with contacts (.xlsx)": "Télécharger un fichier Excel avec des contacts (.xlsx)",
+        "Generate Email": "Générer l'e-mail",
+        "Compose your email details below.": "Composez les détails de votre e-mail ci-dessous.",
+        "Recipient": "Destinataire",
+        "Subject": "Objet",
+        "Body": "Corps",
+        "Sender": "Expéditeur",
+        "Clear Form": "Effacer le Formulaire",
+        "Your email has been generated!": "Votre e-mail a été généré !",
+        "Error generating email. Please try again.": "Erreur lors de la génération de l'e-mail. Veuillez réessayer.",
+        "Recipient, Subject, and Body cannot be empty.": "Le destinataire, l'objet et le corps ne peuvent pas être vides.",
+        "Enter a recipient": "Saisir un destinataire",
+        "Enter a subject": "Saisir un objet",
+        "Enter email body": "Saisir le corps de l'e-mail",
+        "Enter sender name or email": "Saisir le nom ou l'e-mail de l'expéditeur",
+        # New Translations
+        "1. Email Generation": "1. Génération d'emails",
+        "Upload an Excel file with contacts (.xlsx)": "Téléchargez un fichier Excel avec les contacts (.xlsx)",
         "Successfully loaded {count} valid contacts.": "Chargement réussi de {count} contacts valides.",
         "Some contacts had issues and were skipped.": "Certains contacts avaient des problèmes et ont été ignorés.",
         "Show skipped contacts": "Afficher les contacts ignorés",
         "Using previously loaded contacts: {count} valid contacts found.": "Utilisation des contacts précédemment chargés : {count} contacts valides trouvés.",
         "Personalize emails for each contact?": "Personnaliser les e-mails pour chaque contact ?",
-        "Generic Greeting Placeholder (e.g., 'Dear Friends')": "Texte d'accueil générique (par exemple, 'Chers amis')",
-        "Enter your instruction for the AI agent:": "Entrez vos instructions pour l'agent IA :",
-        "AI Instruction": "Instruction IA",
-        "e.g., 'Write a follow-up email to customers who purchased our new product. Thank them and offer a discount on their next purchase.'": "ex., 'Rédigez un e-mail de suivi aux clients qui ont acheté notre nouveau produit. Remerciez-les et offrez-leur une réduction sur leur prochain achat.'",
+        "Generic Greeting Placeholder (e.g., 'Dear Friends')": "Salutation générique (ex. : 'Chers amis')",
+        "Enter your instruction for the AI agent:": "Saisissez votre instruction pour l'agent IA :",
+        "AI Instruction": "Instruction pour l'IA",
+        "e.g., 'Write a follow-up email to customers who purchased our new product. Thank them and offer a discount on their next purchase.'": "ex. : 'Rédigez un e-mail de suivi pour les clients qui ont acheté notre nouveau produit. Remerciez-les et offrez-leur une réduction sur leur prochain achat.'",
         "Additional context for the email (optional):": "Contexte supplémentaire pour l'e-mail (facultatif) :",
         "Email Context": "Contexte de l'e-mail",
-        "e.g., 'Keep the tone professional but friendly.'": "ex., 'Gardez un ton professionnel mais amical.'",
+        "e.g., 'Keep the tone professional but friendly.'": "ex. : 'Gardez un ton professionnel mais amical.'",
         "Attachments (Optional)": "Pièces jointes (facultatif)",
-        "Upload files to attach to all emails": "Télécharger des fichiers à joindre à tous les e-mails",
+        "Upload files to attach to all emails": "Téléchargez des fichiers à joindre à tous les e-mails",
         "You have uploaded {count} attachments.": "Vous avez téléchargé {count} pièces jointes.",
-        "Generate Previews": "Générer les aperçus",
-        "2. Review and Send Emails": "2. Vérifier et envoyer les e-mails",
-        "Review the generated email template below. You can edit the subject and body before sending.": "Vérifiez le modèle d'e-mail généré ci-dessous. Vous pouvez modifier l'objet et le corps avant d'envoyer.",
-        "Email Preview": "Aperçu de l'e-mail",
-        "Activity Log": "Journal d'activité",
+        "No attachments uploaded.": "Aucune pièce jointe téléchargée.",
+        "Generate Email": "Générer l'e-mail",
+        "Generated Email Template": "Modèle d'e-mail généré",
         "Subject": "Objet",
         "Body": "Corps",
-        "Send All Emails": "Envoyer tous les e-mails",
-        "Start New Email Session": "Démarrer une nouvelle session d'e-mail",
-        "Generating email template... This may take a moment.": "Génération du modèle d'e-mail... Cela peut prendre un instant.",
-        "  - Generated template email successfully.": "  - Modèle d'e-mail généré avec succès.",
-        "  - ERROR: Failed to generate template email. Details: {details}": "  - ERREUR : Échec de la génération du modèle d'e-mail. Détails : {details}",
+        "Proceed to Preview": "Passer à l'aperçu",
+        "Generating email template... This may take a moment.": "Génération du modèle d'e-mail... Cela peut prendre un moment.",
+        "Template email generated successfully!": "Modèle d'e-mail généré avec succès !",
+        "ERROR: Failed to generate template email. Details: {details}": "ERREUR : Échec de la génération du modèle d'e-mail. Détails : {details}",
+
+        "2. Aperçu et envoi": "2. Aperçu et envoi",
+        "Review the generated email template below. You can edit the subject and body before sending.": "Vérifiez le modèle d'e-mail ci-dessous. Vous pouvez modifier le sujet et le corps avant l'envoi.",
+        "Email Preview": "Aperçu de l'e-mail",
+        "Preview Subject": "Objet de l'aperçu",
+        "Preview Body": "Corps de l'aperçu",
+        "Confirm Send": "Confirmer l'envoi",
+        "Preparing emails for sending...": "Préparation des e-mails pour l'envoi...",
+        "Email sending process initiated...": "Processus d'envoi d'e-mails initié...",
         "--- [{current}/{total}] Processing contact: {name} ({email}) ---": "--- [{current}/{total}] Traitement du contact : {name} ({email}) ---",
-        "  Attempting Email for {name}...": "  Tentative d'envoi pour {name}...",
-        "    - Email: success - Email sent to {email} successfully.": "    - E-mail : succès - E-mail envoyé à {email} avec succès.",
+        "  Attempting Email for {name}...": "  Tentative d'envoi de l'e-mail pour {name}...",
+        "    - Email: success - Email sent to {email} successfully.": "    - E-mail : succès - E-mail envoyé avec succès à {email}.",
         "    - Email: error - Failed to send to {email}. Details: {details}": "    - E-mail : erreur - Échec de l'envoi à {email}. Détails : {details}",
         "--- Email sending process complete ---": "--- Processus d'envoi d'e-mails terminé ---",
         "ERROR: Could not clean up temporary attachments: ": "ERREUR : Impossible de nettoyer les pièces jointes temporaires : ",
-        "3. Sending Results": "3. Résultats d'envoi",
-        "Email sending is complete!": "L'envoi des e-mails est terminé !",
-        "Total Emails Sent": "Total des e-mails envoyés",
-        "Emails Successfully Sent": "E-mails envoyés avec succès",
-        "Emails Failed to Send": "E-mails non envoyés",
-        "A detailed log has been recorded below.": "Un journal détaillé a été enregistré ci-dessous.",
-        "Generation Log": "Journal de génération",
-        # New strings for the results page
-        "Sending complete": "Envoi terminé",
-        "All emails have been sent or an attempt has been made for each contact.": "Tous les e-mails ont été envoyés ou une tentative a été faite pour chaque contact.",
-        "Sending Log": "Journal d'envoi",
+
+        "3. Résultats d'envoi": "3. Résultats d'envoi",
+        "Start New Email Session": "Commencer une nouvelle session",
+        "All emails sent successfully!": "Tous les e-mails ont été envoyés avec succès !",
+        "All {count} emails were sent without any issues.": "Les {count} e-mails ont été envoyés sans aucun problème.",
+        "Sending complete with errors.": "Envoi terminé avec des erreurs.",
+        "Some emails failed to send. Please check the log below for details.": "Certains e-mails n'ont pas pu être envoyés. Veuillez consulter le journal ci-dessous pour plus de détails.",
+        "Summary": "Résumé",
         "Total Contacts": "Total des contacts",
-        "This app has encountered an error.": "Cette application a rencontré une erreur.",
+        "Emails Successfully Sent": "E-mails envoyés avec succès",
+        "Emails Failed to Send": "E-mails échoués",
+        "Show Activity Log and Errors": "Afficher le journal d'activité et les erreurs"
     }
 }
 
@@ -136,21 +170,8 @@ def set_language(lang_code):
 
 def _t(key, **kwargs):
     """
-    Translates a given key into the selected language.
-    Handles placeholders for dynamic text.
+    Translates a given key into the selected language and formats it with kwargs.
+    If the key is not found, it returns the key itself as a fallback.
     """
-    lang_code = _selected_lang
-    if lang_code not in TRANSLATIONS:
-        lang_code = DEFAULT_LANG
-    
-    translation_text = TRANSLATIONS[lang_code].get(key, key)
-    
-    # Use f-string-like formatting for placeholders
-    if kwargs:
-        try:
-            return translation_text.format(**kwargs)
-        except (KeyError, IndexError):
-            # Fallback to returning the raw string with kwargs for debugging
-            return f"{translation_text} {kwargs}"
-    
-    return translation_text
+    translation = TRANSLATIONS.get(_selected_lang, {}).get(key, key)
+    return translation.format(**kwargs)
