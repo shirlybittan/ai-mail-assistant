@@ -39,7 +39,7 @@ def send_email_message(sender_email, sender_password, to_email, subject, body, a
         sender_password (str): The sender's app password (for Google, Outlook, etc.).
         to_email (str): The recipient's email address.
         subject (str): The subject of the email.
-        body (str): The body content of the email.
+        body (str): The body content of the email, expected to be in HTML format.
         attachments (list, optional): A list of file paths to attach. Defaults to None.
         log_path (str, optional): Path to the file where failed emails should be logged.
                                   Defaults to "failed_emails.log".
@@ -47,7 +47,6 @@ def send_email_message(sender_email, sender_password, to_email, subject, body, a
     Returns:
         dict: A dictionary with 'status' ("success" or "error") and 'message'.
     """
-    # Basic email validation
     if not re.match(r"[^@]+@[^@]+\.[^@]+", to_email):
         _log_failed_email_to_file(sender_email, to_email, subject, body, "Invalid recipient email format", log_path)
         return {"status": "error", "message": "Invalid recipient email format."}
@@ -57,7 +56,8 @@ def send_email_message(sender_email, sender_password, to_email, subject, body, a
     msg['To'] = to_email
     msg['Subject'] = subject
 
-    msg.attach(MIMEText(body, 'html')) # Changed to html as recommended for richer content
+    # --- FIX: Attach the body as HTML to preserve formatting ---
+    msg.attach(MIMEText(body, 'html'))
 
     if attachments:
         for attachment_path in attachments:
@@ -82,7 +82,6 @@ def send_email_message(sender_email, sender_password, to_email, subject, body, a
                 return {"status": "error", "message": error_msg}
 
     try:
-        # Determine SMTP server based on sender email domain
         if "gmail.com" in sender_email:
             smtp_server = "smtp.gmail.com"
             smtp_port = 587

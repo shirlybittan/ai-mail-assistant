@@ -48,7 +48,7 @@ if 'last_uploaded_file_name' not in st.session_state:
 
 # Email generation states
 if 'personalize_emails' not in st.session_state:
-    st.session_state.personalize_emails = False
+    st.session_state.personalize_emails = True # Default to personalized
 if 'template_email' not in st.session_state:
     st.session_state.template_email = None
 if 'user_prompt' not in st.session_state:
@@ -59,6 +59,11 @@ if 'generic_greeting' not in st.session_state:
     st.session_state.generic_greeting = ""
 if 'final_emails_to_send' not in st.session_state:
     st.session_state.final_emails_to_send = []
+# State for editable template
+if 'editable_preview_subject' not in st.session_state:
+    st.session_state.editable_preview_subject = ""
+if 'editable_preview_body' not in st.session_state:
+    st.session_state.editable_preview_body = ""
 
 # Sending results state
 if 'sending_summary' not in st.session_state:
@@ -78,10 +83,12 @@ def reset_state():
     st.session_state.uploaded_attachments = []
     st.session_state.email_sending_status = []
     st.session_state.template_email = None
-    st.session_state.personalize_emails = False
+    st.session_state.personalize_emails = True
     st.session_state.user_prompt = ""
     st.session_state.user_email_context = ""
     st.session_state.generic_greeting = ""
+    st.session_state.editable_preview_subject = ""
+    st.session_state.editable_preview_body = ""
     st.session_state.page = 'generate'
     st.session_state.final_emails_to_send = []
     st.session_state.sending_summary = {
@@ -104,10 +111,8 @@ def generate_email_preview_and_template():
     status_placeholder = st.empty()
     status_placeholder.info(_t("Generating email template... This may take a moment."))
     
-    # Create an agent instance
     agent = SmartEmailAgent(openai_api_key=OPENAI_API_KEY)
 
-    # Call the agent's template generation method once
     template = agent.generate_email_template(
         prompt=st.session_state.user_prompt,
         user_email_context=st.session_state.user_email_context,
@@ -116,6 +121,9 @@ def generate_email_preview_and_template():
 
     if template.get("subject") and "Error" not in template.get("subject"):
         st.session_state.template_email = template
+        # Also update the editable fields
+        st.session_state.editable_preview_subject = template.get("subject", "")
+        st.session_state.editable_preview_body = template.get("body", "")
         status_placeholder.success(_t("Template email generated successfully!"))
         
     else:
@@ -220,12 +228,12 @@ if st.session_state.page == 'generate':
         st.subheader(_t("Generated Email Template"))
         st.session_state.editable_preview_subject = st.text_input(
             _t("Subject"),
-            value=st.session_state.template_email.get("subject", ""),
+            value=st.session_state.editable_preview_subject,
             key="preview_subject"
         )
         st.session_state.editable_preview_body = st.text_area(
             _t("Body"),
-            value=st.session_state.template_email.get("body", ""),
+            value=st.session_state.editable_preview_body,
             height=400,
             key="preview_body"
         )
@@ -240,15 +248,34 @@ elif st.session_state.page == 'preview':
     st.subheader(_t("2. Aperçu et envoi"))
     st.info(_t("Review the generated email template below. You can edit the subject and body before sending."))
 
-    st.subheader(_t("Email Preview"))
     if st.session_state.template_email and st.session_state.contacts:
         
-        # Get the first contact for preview
-        first_contact = st.session_state.contacts[0]
-        recipient_name = first_contact.get('name', 'Contact')
-        recipient_email = first_contact['email']
+        # --- NEW: DYNAMIC PREVIEW SECTION ---
+        st.subheader(_t("Live Preview (Example for First Contact)"))
         
-        # User can now edit subject and body directly on this page
+        first_contact = st.session_state.contacts[0]
+        preview_subject = st.session_state.editable_preview_subject
+        preview_body = st.session_state.editable_preview_body
+
+        if st.session_state.personalize_emails:
+            recipient_name = first_contact.get('name', 'Contact')
+            preview_subject = preview_subject.replace("{{Name}}", recipient_name)
+            preview_body = preview_body.replace("{{Name}}", recipient_name)
+        elif st.session_state.generic_greeting:
+            preview_subject = preview_subject.replace("{{Name}}", st.session_state.generic_greeting)
+            preview_body = preview_body.replace("{{Name}}", st.session_state.generic_greeting)
+        
+        preview_body_html = preview_body.replace('\n', '<br>')
+
+        with st.container(border=True):
+            st.markdown(f"**{_t('Subject')}:** {preview_subject}")
+            st.markdown("---")
+            st.markdown(preview_body_html, unsafe_allow_html=True)
+        # --- END OF NEW SECTION ---
+
+        st.markdown("---")
+        st.subheader(_t("Edit Template"))
+        
         st.session_state.editable_preview_subject = st.text_input(
             _t("Preview Subject"),
             value=st.session_state.editable_preview_subject,
@@ -298,12 +325,15 @@ elif st.session_state.page == 'preview':
                 
                 final_subject = final_subject.replace("{{Email}}", recipient_email)
                 final_body = final_body.replace("{{Email}}", recipient_email)
+
+                # --- FIX: Convert newlines to <br> for HTML email ---
+                final_body_html = final_body.replace('\n', '<br>')
                 
                 st.session_state.final_emails_to_send.append({
                     "recipient_email": recipient_email,
                     "recipient_name": recipient_name,
                     "subject": final_subject,
-                    "body": final_body,
+                    "body": final_body_html, # Send the HTML version
                     "attachments": st.session_state.uploaded_attachments
                 })
         
@@ -375,15 +405,13 @@ elif st.session_state.page == 'results':
     st.subheader(_t("3. Résultats d'envoi"))
     
     with st.container():
-        cols = st.columns(3)
-        with cols[1]:
-            if st.button(_t("Start New Email Session"), use_container_width=True):
-                reset_state()
-                st.rerun()
+        if st.button(_t("Start New Email Session"), use_container_width=True):
+            reset_state()
+            st.rerun()
         
         st.markdown("---")
         
-        if st.session_state.sending_summary['failed'] == 0:
+        if st.session_state.sending_summary['failed'] == 0 and st.session_state.sending_summary['successful'] > 0:
             st.success(_t("All emails sent successfully!"))
             st.write(_t("All {count} emails were sent without any issues.", count=st.session_state.sending_summary['total_contacts']))
         else:
@@ -400,8 +428,14 @@ elif st.session_state.page == 'results':
         with col3:
             st.metric(_t("Emails Failed to Send"), st.session_state.sending_summary['failed'])
 
-        if st.session_state.sending_summary['failed'] > 0:
+        if st.session_state.email_sending_status:
             st.markdown("---")
             with st.expander(_t("Show Activity Log and Errors")):
+                log_container = st.container(height=300)
                 for log_entry in st.session_state.email_sending_status:
-                    st.write(log_entry)
+                    if "error" in log_entry.lower() or "failed" in log_entry.lower():
+                        log_container.error(log_entry)
+                    elif "success" in log_entry.lower():
+                        log_container.success(log_entry)
+                    else:
+                        log_container.write(log_entry)
