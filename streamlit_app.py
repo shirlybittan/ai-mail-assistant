@@ -148,7 +148,7 @@ with st.sidebar:
 
 # --- Page Navigation Logic ---
 if st.session_state.page == 'generate':
-    st.subheader(_t("1. Email Generation"))
+    st.subheader(_t("1. Génération d'emails"))
     
     uploaded_file = st.file_uploader(
         _t("Upload an Excel file with contacts (.xlsx)"),
@@ -390,9 +390,13 @@ elif st.session_state.page == 'results':
         
         st.markdown("---")
         
-        st.success(_t("Sending complete"))
-        st.write(_t("All emails have been sent or an attempt has been made for each contact."))
-        
+        if st.session_state.sending_summary['failed'] == 0:
+            st.success(_t("All emails sent successfully!"))
+            st.write(_t("All {count} emails were sent without any issues.", count=st.session_state.sending_summary['total_contacts']))
+        else:
+            st.warning(_t("Sending complete with errors."))
+            st.write(_t("Some emails failed to send. Please check the log below for details."))
+
         st.markdown("---")
         
         st.subheader(_t("Summary"))
@@ -404,15 +408,7 @@ elif st.session_state.page == 'results':
         with col3:
             st.metric(_t("Emails Failed to Send"), st.session_state.sending_summary['failed'])
 
-        st.markdown("---")
-        st.subheader(_t("Activity Log"))
-        # Display the full log on the results page
-        for log_entry in st.session_state.email_sending_status:
-            st.write(log_entry)
-
-        failed_emails_log = [log for log in st.session_state.email_sending_status if 'error' in log.lower() or 'failed' in log.lower()]
-
-        if failed_emails_log:
-            with st.expander(_t("Show logs for failed emails")):
-                for log_entry in failed_emails_log:
+        if st.session_state.sending_summary['failed'] > 0:
+            with st.expander(_t("Show Activity Log and Errors")):
+                for log_entry in st.session_state.email_sending_status:
                     st.write(log_entry)
