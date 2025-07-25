@@ -8,7 +8,8 @@ from translations import LANGUAGES, _t, set_language
 from contextlib import contextmanager
 import datetime
 import os
-import shutil
+import shutil # Import shutil for file operations
+import tempfile # Import tempfile for temporary file handling
 import re
 
 # --- CSS Styling ---
@@ -51,8 +52,8 @@ def init_state():
         st.session_state.editable_subject = ''
         st.session_state.editable_body = ''
         st.session_state.initialized = True
-        # New state variable for tracking the last uploaded file ID
-        st.session_state.last_uploaded_file_id = None 
+        # last_uploaded_file_id is removed as we are no longer relying on uploaded_file.id
+        st.session_state.uploaded_file_name = None # To track if the file has changed by name
 init_state()
 
 # --- UI Helpers ---
@@ -131,8 +132,6 @@ def page_generate():
     st.subheader(_t("1. Email Generation"))
     render_step_indicator(1)
     # --- File Upload ---
-    if 'uploaded_file' not in st.session_state:
-        st.session_state.uploaded_file = None
     if 'show_generation' not in st.session_state:
         st.session_state.show_generation = False
 
@@ -140,26 +139,27 @@ def page_generate():
         _t("Upload Excel (.xlsx/.xls)"), type=["xlsx","xls"]
     )
 
-    current_file_id = None
-    if uploaded_file is not None:
-        # Get the ID of the currently uploaded file safely
-        current_file_id = uploaded_file.id
-
-    # Process file only if it's a new upload or different from the last processed one
-    if current_file_id is not None and \
-       (st.session_state.last_uploaded_file_id is None or \
-        st.session_state.last_uploaded_file_id != current_file_id):
+    # Process file only if it's a new upload (by name)
+    if uploaded_file is not None and \
+       (st.session_state.uploaded_file_name is None or \
+        st.session_state.uploaded_file_name != uploaded_file.name):
         
-        # Only process if a new or different file has been uploaded
-        contacts, issues = load_contacts_from_excel(uploaded_file)
+        # Save uploaded file to a temporary location
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_file:
+            shutil.copyfileobj(uploaded_file, tmp_file)
+            temp_file_path = tmp_file.name
+
+        contacts, issues = load_contacts_from_excel(temp_file_path)
         st.session_state.contacts = contacts
         st.session_state.contact_issues = issues
-        st.session_state.uploaded_file = uploaded_file
-        st.session_state.last_uploaded_file_id = current_file_id # Store the ID of the new file
-        st.session_state.show_generation = False
+        st.session_state.uploaded_file_name = uploaded_file.name # Store the name of the new file
+        st.session_state.show_generation = False # Reset to show upload results first
+
+        # Clean up the temporary file
+        os.remove(temp_file_path)
 
     # --- Show results of upload ---
-    if st.session_state.uploaded_file is not None:
+    if st.session_state.uploaded_file_name is not None:
         count = len(st.session_state.contacts) if 'contacts' in st.session_state else 0
         st.success(_t("Loaded {count} contacts.", count=count))
         for issue in st.session_state.get('contact_issues', []):
