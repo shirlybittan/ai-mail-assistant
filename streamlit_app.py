@@ -1,36 +1,85 @@
+# streamlit_app.py
+
 import streamlit as st
 import pandas as pd
 from data_handler import load_contacts_from_excel
 from email_agent import SmartEmailAgent
 from email_tool import send_email_message
-from config import SENDER_EMAIL, SENDER_PASSWORD, OPENAI_API_KEY, FAILED_EMAILS_LOG_PATH
-from translations import LANGUAGES, _t, set_language # Ensure set_language is imported
-from contextlib import contextmanager
-import datetime
+from config import SENDER_CREDENTIALS, OPENAI_API_KEY, SENDER_EMAIL, SENDER_PASSWORD, FAILED_EMAILS_LOG_PATH
+import tempfile
 import os
 import shutil
-import tempfile # Import tempfile for temporary file handling
+import datetime
 import re
 
-# --- CSS Styling ---
+# --- IMPORT LANGUAGE HELPER ---
+from translations import LANGUAGES, _t, set_language
+
+# --- CSS Styling (Removed potentially conflicting CSS, keeping it minimal for clarity) ---
 st.markdown("""
 <style>
-body {
-    background: linear-gradient(135deg, #f0f4fc, #c8d8f8);
+/* Basic Streamlit adjustments for better appearance */
+.stApp {
+    background: #f0f4fc; /* Light background */
 }
-.card {
-    background: white;
+/* Ensure text input and text area elements have appropriate width */
+.stTextInput > div > div > input {
+    width: 100%;
+}
+.stTextArea > div > div > textarea {
+    width: 100%;
+    min-height: 150px; /* Give more space to body text area */
+}
+/* Custom styling for the step indicators */
+.step-indicator {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 20px;
+}
+.step {
+    padding: 10px 15px;
+    border-radius: 20px;
+    background-color: #e0e0e0;
+    color: #555;
+    font-weight: bold;
+    font-size: 0.9em;
+}
+.step.active {
+    background-color: #4CAF50; /* Green for active step */
+    color: white;
+}
+.step.completed {
+    background-color: #2196F3; /* Blue for completed step */
+    color: white;
+}
+.stExpander {
     border-radius: 12px;
-    padding: 1rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    margin-bottom: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
-/* Ensure Streamlit elements don't create extra unwanted space */
-div.stActionButton, div.stDownloadButton, div.stFileUploadDropzone {
-    margin-bottom: 0.5rem; /* Adjust as needed */
+.stExpander details summary {
+    font-weight: bold;
+    color: #2c3e50;
 }
+
+/* Remove the block over object text area - This might be a visual glitch or specific element */
+/* Targeting generic block-like elements that might overlay text areas */
+/* If a specific class or ID is known for the "block", it should be targeted more precisely */
+div[data-testid="stVerticalBlock"] > div:not(:has([data-testid="stTextInput"], [data-testid="stTextArea"])) {
+    /* This rule tries to target vertical blocks that do NOT contain text inputs/areas.
+       Adjust as needed if the "block" is a specific Streamlit component. */
+    z-index: auto !important; /* Ensure no overlay issues */
+}
+
+/* Specific fix for text areas to ensure they are always on top */
+div[data-testid="stTextArea"] {
+    position: relative;
+    z-index: 10; /* Ensure text area is above other elements if there's a layering issue */
+}
+
+
 </style>
 """, unsafe_allow_html=True)
+
 
 # --- Page Config ---
 st.set_page_config(layout="wide", page_title=_t("AI Email Assistant"))
@@ -38,308 +87,360 @@ st.set_page_config(layout="wide", page_title=_t("AI Email Assistant"))
 # --- Session State Initialization ---
 def init_state():
     if 'initialized' not in st.session_state:
-        st.session_state.language = 'fr'
+        st.session_state.language = 'fr' # Default to French
         st.session_state.page = 'generate'
         st.session_state.contacts = []
         st.session_state.contact_issues = []
-        st.session_state.attachments = []
+        st.session_state.uploaded_attachments = [] # Renamed from 'attachments' for clarity
+        st.session_state.generated_email = None
+        st.session_state.email_generation_error = None
+        st.session_state.sending_summary = {'total_contacts': 0, 'successful': 0, 'failed': 0}
         st.session_state.email_sending_status = []
-        st.session_state.sending_summary = {'total_contacts':0, 'successful':0, 'failed':0}
-        st.session_state.generation_in_progress = False
-        st.session_state.sending_in_progress = False
-        st.session_state.user_prompt = ''
-        st.session_state.user_email_context = ''
-        st.session_state.personalize_emails = False
-        st.session_state.generic_greeting = ''
-        st.session_state.template_subject = ''
-        st.session_state.template_body = ''
-        st.session_state.editable_subject = ''
-        st.session_state.editable_body = ''
-        st.session_state.initialized = True
-        st.session_state.uploaded_file_name = None # To track if the file has changed by name
+        st.session_state.recipient_name = ""
+        st.session_state.subject_prompt = ""
+        st.session_state.body_prompt = ""
+        st.session_state.user_context = "" # Added to store optional user context for AI
+        st.session_state.uploaded_file = None # To hold the uploaded Excel file object
+        st.session_state.excel_file_path = None # To hold the path to the saved temp Excel file
+        st.session_state.initialized = True # Mark as initialized
+
+# Initialize state on app start
 init_state()
+set_language(st.session_state.language) # Ensure language is set based on session state
 
-# --- Language Selection (moved up for immediate effect) ---
-with st.sidebar:
-    # Set language based on session state, and update if changed
-    chosen_lang = st.selectbox(
-        "Language", # Use a hardcoded string here as this is the selector label itself
-        options=list(LANGUAGES.keys()),
-        format_func=lambda x: LANGUAGES[x], # Display full language name
-        index=list(LANGUAGES.keys()).index(st.session_state.language),
-        key="language_selector"
-    )
-    if chosen_lang != st.session_state.language:
-        st.session_state.language = chosen_lang
-        set_language(chosen_lang)
-        # Rerun to apply language changes immediately to the whole app
-        st.rerun()
-
-# Apply the selected language immediately after initialization and selection
-set_language(st.session_state.language)
-
-# --- UI Helpers ---
-def render_step_indicator(current_step: int):
-    steps = [_t("1. Generation"), _t("2. Preview"), _t("3. Results")]
-    cols = st.columns(len(steps))
-    for idx, label in enumerate(steps, start=1):
-        text = f"▶ **{label}**" if idx == current_step else label
-        with cols[idx-1]:
-            st.markdown(f"<p style='text-align: center;'>{text}</p>", unsafe_allow_html=True) # Center align steps
-
-@contextmanager
-def card_container():
-    st.markdown("<div class='card'>", unsafe_allow_html=True)
-    yield
-    st.markdown("</div>", unsafe_allow_html=True)
-
-# --- Business Logic ---
-def generate_email_preview_and_template():
-    st.session_state.generation_in_progress = True
-    agent = SmartEmailAgent(openai_api_key=OPENAI_API_KEY)
-    
-    # Pass personalize_emails flag to the agent
-    template = agent.generate_email_template(
-        prompt=st.session_state.user_prompt,
-        user_email_context=st.session_state.user_email_context,
-        output_language=st.session_state.language,
-        personalize_emails=st.session_state.personalize_emails
-    )
-    st.session_state.template_subject = template['subject']
-    st.session_state.template_body = template['body']
-    st.session_state.editable_subject = template['subject']
-    st.session_state.editable_body = template['body']
-    st.session_state.page = 'preview'
-    st.session_state.generation_in_progress = False
+# --- Global Variables / Access from config (defined at top scope) ---
+selected_sender_email = SENDER_EMAIL
+selected_sender_password = SENDER_PASSWORD
+# Initialize SmartEmailAgent
+agent = SmartEmailAgent(openai_api_key=OPENAI_API_KEY)
 
 
-def send_all_emails():
-    st.session_state.sending_in_progress = True
-    status = []
-    success = fail = 0
-    for contact in st.session_state.contacts:
-        # Use contact name if personalizing, otherwise use generic greeting (if set)
-        if st.session_state.personalize_emails and contact.get('name'):
-            name_for_email = contact['name']
-        else:
-            name_for_email = st.session_state.generic_greeting if st.session_state.generic_greeting else _t("Valued Customer") # Fallback to a default generic if user didn't set one
-
-        email = contact.get('email')
-
-        # Replace placeholders based on personalization setting
-        subj = st.session_state.editable_subject
-        body = st.session_state.editable_body
-
-        if st.session_state.personalize_emails:
-            subj = subj.replace('{{Name}}', name_for_email).replace('{{Email}}', email)
-            body = body.replace('{{Name}}', name_for_email).replace('{{Email}}', email)
-        # If not personalizing, {{Name}} and {{Email}} should ideally not be in the template,
-        # but if they are, they won't be replaced here. The AI prompt should prevent them.
-
-        try:
-            result = send_email_message(
-                sender_email=SENDER_EMAIL,
-                sender_password=SENDER_PASSWORD,
-                to_email=email,
-                subject=subj,
-                body=body,
-                attachments=st.session_state.attachments,
-                log_path=FAILED_EMAILS_LOG_PATH
-            )
-            if result.get('status') == 'success':
-                msg = f"Success: {name_for_email} <{email}>"
-                success += 1
-            else:
-                msg = f"Error: {name_for_email} <{email}> - {result.get('message')}"
-                fail += 1
-            status.append(msg)
-        except Exception as e:
-            msg = f"Error: {name_for_email} <{email}> - {str(e)}"
-            status.append(msg)
-            fail += 1
-    st.session_state.email_sending_status = status
-    st.session_state.sending_summary = {
-        'total_contacts': len(st.session_state.contacts),
-        'successful': success,
-        'failed': fail
+# --- Helper Function for Step Indicator ---
+def render_step_indicator(current_step):
+    steps = {
+        1: _t("1. Email Generation"),
+        2: _t("2. Preview & Attachments"),
+        3: _t("3. Results")
     }
-    st.session_state.page = 'results'
-    st.session_state.sending_in_progress = False
+    
+    cols = st.columns(len(steps))
+    for i, (step_num, step_text) in enumerate(steps.items()):
+        if current_step == step_num:
+            status_class = "active"
+        elif current_step > step_num:
+            status_class = "completed"
+        else:
+            status_class = ""
+        
+        with cols[i]:
+            st.markdown(f'<div class="step {status_class}">{step_text}</div>', unsafe_allow_html=True)
 
-# --- Page: Generate ---
+# --- Functions for Page Navigation ---
+def go_to_page(page_name):
+    st.session_state.page = page_name
+    st.experimental_rerun()
+
+# --- Core Functions ---
+@st.spinner(_t("Generating email content..."))
+def generate_email_content(subject_prompt, body_prompt, user_context, output_language):
+    # Combine subject and body prompts for the AI
+    full_prompt = f"Subject: {subject_prompt}\nBody: {body_prompt}"
+    
+    # Generate email template
+    generated_email = agent.generate_email_template(
+        prompt=full_prompt,
+        user_email_context=user_context,
+        output_language=output_language
+    )
+    return generated_email
+
+@st.spinner(_t("Sending emails..."))
+def send_all_emails():
+    st.session_state.email_sending_status = [] # Clear previous status
+    successful_sends = 0
+    failed_sends = 0
+    total_contacts = len(st.session_state.contacts)
+
+    st.session_state.email_sending_status.append(_t(f"Initiating email send for {total_contacts} contacts..."))
+    
+    for i, contact in enumerate(st.session_state.contacts):
+        contact_name = contact.get('name', contact['email'])
+        st.session_state.email_sending_status.append(_t(f"--- [{i+1}/{total_contacts}] Processing contact: {contact_name} ({contact['email']}) ---"))
+        
+        # Replace placeholders in the generated subject and body
+        personalized_subject = st.session_state.generated_email['subject'].replace("{{Name}}", contact.get('name', ''))
+        personalized_body = st.session_state.generated_email['body'].replace("{{Name}}", contact.get('name', ''))
+        
+        # Add other potential placeholders here if your AI generates them
+        personalized_subject = personalized_subject.replace("{{Email}}", contact.get('email', ''))
+        personalized_body = personalized_body.replace("{{Email}}", contact.get('email', ''))
+        
+        # Example for Custom_Field - adapt based on your excel columns
+        # if 'Custom_Field' in contact:
+        #     personalized_subject = personalized_subject.replace("{{Custom_Field}}", contact['Custom_Field'])
+        #     personalized_body = personalized_body.replace("{{Custom_Field}}", contact['Custom_Field'])
+
+        st.session_state.email_sending_status.append(_t(f"Attempting to send email to {contact['email']}..."))
+        send_result = send_email_message(
+            sender_email=selected_sender_email,
+            sender_password=selected_sender_password,
+            to_email=contact['email'],
+            subject=personalized_subject,
+            body=personalized_body,
+            attachments=st.session_state.uploaded_attachments,
+            log_path=FAILED_EMAILS_LOG_PATH
+        )
+
+        if send_result['status'] == 'success':
+            successful_sends += 1
+            st.session_state.email_sending_status.append(_t(f"    - Email: success - Sent to {contact['email']}."))
+        else:
+            failed_sends += 1
+            st.session_state.email_sending_status.append(_t(f"    - Email: error - Failed to send to {contact['email']}. Reason: {send_result['message']}"))
+            
+    st.session_state.sending_summary = {
+        'total_contacts': total_contacts,
+        'successful': successful_sends,
+        'failed': failed_sends
+    }
+    st.session_state.email_sending_status.append(_t("--- Email sending process complete ---"))
+    st.session_state.email_sending_status.append(_t(f"Summary: {successful_sends} successful, {failed_sends} failed/skipped."))
+    
+    # Transition to results page after sending
+    go_to_page('results')
+
+
+# --- Page Functions ---
+
+# --- Page: Generate Email ---
 def page_generate():
     st.subheader(_t("1. Email Generation"))
     render_step_indicator(1)
 
-    # --- File Upload ---
-    if 'show_generation_form' not in st.session_state: # Renamed from show_generation for clarity
-        st.session_state.show_generation_form = False
+    st.write(_t("Compose your email details below."))
 
+    # Sender Email (Read-only as it's from config)
+    st.info(_t("Sender Email: {email} (Configured in secrets)").format(email=selected_sender_email))
+    
+    # Upload Excel for Contacts
     uploaded_file = st.file_uploader(
-        _t("Upload Excel (.xlsx/.xls)"), type=["xlsx","xls"]
+        _t("Upload an Excel file with contacts (.xlsx)"),
+        type=["xlsx"],
+        key="excel_uploader"
     )
 
-    # Process file only if a new file is uploaded (by name)
-    if uploaded_file is not None and \
-       (st.session_state.uploaded_file_name is None or \
-        st.session_state.uploaded_file_name != uploaded_file.name):
-        
-        # Save uploaded file to a temporary location
+    if uploaded_file and uploaded_file != st.session_state.uploaded_file:
+        st.session_state.uploaded_file = uploaded_file
+        # Save the uploaded file temporarily
         with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_file:
-            shutil.copyfileobj(uploaded_file, tmp_file)
-            temp_file_path = tmp_file.name
-
-        contacts, issues = load_contacts_from_excel(temp_file_path)
+            tmp_file.write(uploaded_file.getvalue())
+            st.session_state.excel_file_path = tmp_file.name
+        
+        contacts, issues = load_contacts_from_excel(st.session_state.excel_file_path)
         st.session_state.contacts = contacts
         st.session_state.contact_issues = issues
-        st.session_state.uploaded_file_name = uploaded_file.name # Store the name of the new file
-        st.session_state.show_generation_form = False # Reset to show upload results first
-
-        # Clean up the temporary file
-        os.remove(temp_file_path)
-        st.rerun() # Rerun to properly display updated contacts and issues
-
-    # --- Show results of upload and conditional UI ---
-    if st.session_state.uploaded_file_name is not None:
-        count = len(st.session_state.contacts) if 'contacts' in st.session_state else 0
-        st.success(_t("Loaded {count} contacts.", count=count))
-        for issue in st.session_state.get('contact_issues', []):
-            st.warning(issue)
         
-        st.markdown("---") # Visual separator
-
-        # Conditionally show generation form or "Next" button
-        if not st.session_state.show_generation_form:
-            if st.button(_t("Next"), use_container_width=True, key="next_to_generation_form"):
-                st.session_state.show_generation_form = True
-                st.rerun() # Rerun to immediately show the form
+        if contacts:
+            st.success(_t("Successfully loaded {count} valid contacts.").format(count=len(contacts)))
+            if issues:
+                st.warning(_t("Some contacts had issues (e.g., missing/invalid emails). They will be skipped."))
+                for issue in issues:
+                    st.error(issue)
         else:
-            # --- Generation form ---
-            st.session_state.personalize_emails = st.checkbox(
-                _t("Personalize emails?"), value=st.session_state.personalize_emails, key="personalize_checkbox"
-            )
-            if not st.session_state.personalize_emails:
-                st.session_state.generic_greeting = st.text_input(
-                    _t("Generic Greeting"), value=st.session_state.generic_greeting, key="generic_greeting_input"
-                )
-            else:
-                # Clear generic greeting if personalization is re-enabled
-                if 'generic_greeting' in st.session_state and st.session_state.generic_greeting:
-                    st.session_state.generic_greeting = ''
-            
-            st.session_state.user_prompt = st.text_area(
-                _t("AI Instruction"), value=st.session_state.user_prompt, height=150, key="ai_instruction_input"
-            )
-            st.session_state.user_email_context = st.text_area(
-                _t("Email Context (optional)"), value=st.session_state.user_email_context, height=100, key="email_context_input"
-            )
-            
-            if st.button(_t("Generate Email"), use_container_width=True, key="generate_email_button"):
-                if st.session_state.user_prompt:
-                    with st.spinner(_t("Generating email template... Please wait.")):
-                        generate_email_preview_and_template()
-                else:
-                    st.warning(_t("Please provide instructions for the AI to generate the email."))
-    else:
-        # This is the initial state before any file is uploaded
-        st.info(_t("Please upload an Excel file to get started."))
-        # This ensures the "white empty block" is minimized by explicitly showing a message
+            st.error(_t("No valid contacts found in the Excel file or an error occurred during loading."))
+            if issues:
+                for issue in issues:
+                    st.error(issue)
+        
+        st.experimental_rerun() # Rerun to update UI with contact info
 
-# --- Page: Preview ---
+
+    if st.session_state.contacts:
+        st.write(_t(f"Currently loaded {len(st.session_state.contacts)} valid contacts."))
+        with st.expander(_t("View Loaded Contacts")):
+            st.dataframe(pd.DataFrame(st.session_state.contacts))
+    elif st.session_state.excel_file_path: # File was uploaded but no valid contacts
+         st.error(_t("No valid contacts were loaded from the file. Please check your Excel format."))
+
+
+    # Email Prompts
+    st.markdown("---")
+    st.subheader(_t("Email Content Generation"))
+    st.text_input(_t("Subject Prompt (e.g., 'A welcome email')"), 
+                  value=st.session_state.subject_prompt, 
+                  key="subject_prompt_input",
+                  placeholder=_t("Enter a subject prompt"))
+    
+    st.text_area(_t("Body Prompt (e.g., 'Thank them for signing up and offer a link to our tutorial.')"), 
+                 value=st.session_state.body_prompt, 
+                 key="body_prompt_input",
+                 height=150,
+                 placeholder=_t("Enter the body prompt"))
+
+    st.text_area(_t("Optional: Additional context/style for AI (e.g., 'Make it formal and concise.')"), 
+                 value=st.session_state.user_context, 
+                 key="user_context_input",
+                 height=100,
+                 placeholder=_t("Optional context for AI generation"))
+
+    st.markdown("---")
+    
+    # Generate Button
+    # The first button on the first page is 'Upload an Excel file'.
+    # The 'Generate Email' button's behavior: it should trigger AI generation and then move to the next page.
+    if st.button(_t("Generate Email"), use_container_width=True, key="generate_email_btn", 
+                 disabled=not (st.session_state.subject_prompt_input and st.session_state.body_prompt_input)):
+        
+        if st.session_state.subject_prompt_input and st.session_state.body_prompt_input:
+            with st.spinner(_t("Generating email... This may take a moment.")):
+                generated_email = generate_email_content(
+                    st.session_state.subject_prompt_input,
+                    st.session_state.body_prompt_input,
+                    st.session_state.user_context_input,
+                    st.session_state.language
+                )
+            
+            if generated_email and not generated_email.get('subject') == 'Error':
+                st.session_state.generated_email = generated_email
+                st.session_state.email_generation_error = None
+                go_to_page('preview') # Change page after successful generation
+            else:
+                st.error(_t("Error generating email. Please try again. Details: {error_details}").format(error_details=generated_email.get('body', 'Unknown Error')))
+                st.session_state.email_generation_error = _t("Error generating email.")
+        else:
+            st.error(_t("Subject and Body prompts cannot be empty."))
+            st.session_state.email_generation_error = _t("Subject and Body prompts cannot be empty.")
+
+
+# --- Page: Preview & Attachments ---
 def page_preview():
-    st.subheader(_t("2. Preview & Attachments"))
+    st.subheader(_t("2. Preview & Attachments")) # TRANSLATED
     render_step_indicator(2)
 
-    col1, col2 = st.columns(2)
-    with col1:
-        with card_container():
-            st.session_state.editable_subject = st.text_input(
-                _t("Subject"), value=st.session_state.editable_subject, key="preview_subject_input"
-            )
-            st.session_state.editable_body = st.text_area(
-                _t("Body"), value=st.session_state.editable_body, height=350, key="preview_body_input" # Increased height
-            )
+    if st.button(_t("Back to Generation"), use_container_width=True): # TRANSLATED
+        go_to_page('generate')
+
+    st.markdown("---")
+
+    if st.session_state.generated_email:
+        st.subheader(_t("Generated Email Preview")) # TRANSLATED
         
-        # Back button
-        if st.button(_t("Back to Generation"), use_container_width=True, key="back_to_generate_button"):
-            st.session_state.page = 'generate'
-            st.rerun()
-
-    with col2:
-        with st.expander(_t("Live Preview"), expanded=True):
-            if st.session_state.contacts:
-                first = st.session_state.contacts[0]
-                
-                # Determine name for preview based on personalization
-                if st.session_state.personalize_emails and first.get('name'):
-                    name_for_preview = first['name']
-                else:
-                    name_for_preview = st.session_state.generic_greeting if st.session_state.generic_greeting else _t("Valued Customer")
-
-                email = first.get('email', 'example@example.com') # Fallback email for preview
-                
-                preview_subj = st.session_state.editable_subject.replace("{{Name}}", name_for_preview).replace("{{Email}}", email)
-                preview_body = st.session_state.editable_body.replace("{{Name}}", name_for_preview).replace("{{Email}}", email)
-                
-                st.markdown(f"**{_t('Subject')}:** {preview_subj}")
-                # Ensure formatting (line breaks) are preserved in markdown display
-                st.markdown(preview_body.replace('\n', '  \n'), unsafe_allow_html=True) 
-            else:
-                st.info(_t("Upload contacts in the previous step to see a preview."))
-
-    st.markdown("---") # Separator before attachments
-    files = st.file_uploader(
-        _t("Add Attachments"), accept_multiple_files=True, key="attachment_uploader"
-    )
-    if files:
-        st.session_state.attachments = files
-        st.info(_t("Attachments selected: {count}", count=len(files)))
-    
-    if st.session_state.attachments:
-        st.markdown(f"**{_t('Current Attachments')}:**")
-        for att in st.session_state.attachments:
-            st.write(f"- {att.name}")
-
-    if st.button(_t("Confirm Send"), use_container_width=True, key="confirm_send_button"):
+        # Display email to the first contact for preview purposes
         if st.session_state.contacts:
-            with st.spinner(_t("Sending emails... This may take a moment.")):
-                send_all_emails()
+            first_contact = st.session_state.contacts[0]
+            preview_name = first_contact.get('name', _t("Recipient"))
+            preview_email = first_contact.get('email', 'N/A')
+
+            st.write(f"**{_t('Email will be sent to')}:** {preview_name} <{preview_email}>") # TRANSLATED
+
+            personalized_subject = st.session_state.generated_email['subject'].replace("{{Name}}", preview_name)
+            personalized_body = st.session_state.generated_email['body'].replace("{{Name}}", preview_name)
+            
+            # Add other potential placeholders here if your AI generates them
+            personalized_subject = personalized_subject.replace("{{Email}}", preview_email)
+            personalized_body = personalized_body.replace("{{Email}}", preview_email)
+
+            st.write(f"**{_t('Subject')}:** {personalized_subject}") # TRANSLATED
+            st.markdown(f"**{_t('Body')}:**") # TRANSLATED
+            st.markdown(personalized_body, unsafe_allow_html=True) # Render as HTML
         else:
-            st.warning(_t("No contacts loaded to send emails to."))
+            st.warning(_t("No contacts loaded to show a personalized preview. Showing generic template."))
+            st.write(f"**{_t('Subject')}:** {st.session_state.generated_email['subject']}") # TRANSLATED
+            st.markdown(f"**{_t('Body')}:**") # TRANSLATED
+            st.markdown(st.session_state.generated_email['body'], unsafe_allow_html=True) # Render as HTML
+
+    else:
+        st.warning(_t("No email content has been generated yet. Please go back to the 'Email Generation' page."))
+        if st.button(_t("Go to Email Generation")): # TRANSLATED
+            go_to_page('generate')
+        return
+
+    st.markdown("---")
+    st.subheader(_t("Add Attachments (Optional)")) # TRANSLATED
+    
+    uploaded_files = st.file_uploader(
+        _t("Select one or more files"), # TRANSLATED
+        type=None, # Allow all file types
+        accept_multiple_files=True,
+        key="attachment_uploader"
+    )
+
+    # Handle attachments
+    current_attachments = st.session_state.uploaded_attachments # Use the session state variable
+    
+    if uploaded_files:
+        # Clear previous attachments if new files are uploaded
+        if any(f.name not in [prev_f.name for prev_f in current_attachments] for f in uploaded_files):
+             # If new files are different, assume user wants to replace
+            st.session_state.uploaded_attachments = [] 
+            
+            for uploaded_file in uploaded_files:
+                # Create a temporary file to store the attachment
+                with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(uploaded_file.name)[1]) as tmp_file:
+                    tmp_file.write(uploaded_file.getvalue())
+                    st.session_state.uploaded_attachments.append(tmp_file.name)
+            st.success(_t(f"Successfully added {len(st.session_state.uploaded_attachments)} attachment(s)."))
+            st.experimental_rerun() # Rerun to update the list of attachments displayed
+
+    if st.session_state.uploaded_attachments:
+        st.write(f"**{_t('Attachments')}:**") # TRANSLATED
+        for f_path in st.session_state.uploaded_attachments:
+            st.write(f"- {os.path.basename(f_path)}")
+        if st.button(_t("Clear Attachments")): # TRANSLATED
+            for f_path in st.session_state.uploaded_attachments:
+                try:
+                    os.remove(f_path) # Clean up temp files
+                except OSError:
+                    pass
+            st.session_state.uploaded_attachments = []
+            st.experimental_rerun()
+    else:
+        st.info(_t("No attachments selected.")) # TRANSLATED
+
+
+    st.markdown("---")
+    if st.button(_t("Confirm Send"), use_container_width=True, 
+                 disabled=not (st.session_state.contacts and st.session_state.generated_email)): # TRANSLATED
+        send_all_emails() # This function already transitions to results page
 
 
 # --- Page: Results ---
 def page_results():
-    st.subheader(_t("3. Results"))
+    st.subheader(_t("3. Results")) # TRANSLATED
     render_step_indicator(3)
-    
-    st.markdown("---")
+
+    if st.button(_t("Start New Email Session"), use_container_width=True): # TRANSLATED
+        # Clear all relevant session state variables
+        st.session_state.clear()
+        init_state() # Re-initialize to default clean state
+        go_to_page('generate') # Go back to the first page immediately
+        
+
     total = st.session_state.sending_summary['total_contacts']
     suc = st.session_state.sending_summary['successful']
     fail = st.session_state.sending_summary['failed']
-
-    if total == suc and total > 0:
-        st.success(_t("All emails sent successfully!"))
-        st.write(_t("All {count} emails were sent without any issues.", count=total))
-    elif total > 0:
-        st.warning(_t("Sending complete with errors."))
-        st.write(_t("Some emails failed to send. Please check the log below for details."))
+    
+    st.markdown("---")
+    if fail == 0 and suc > 0:
+        st.success(_t("All emails sent successfully!")) # TRANSLATED
+        st.write(_t("All {count} emails were sent without any issues.").format(count=total)) # TRANSLATED
     else:
-        st.info(_t("No emails were processed."))
-        
+        st.warning(_t("Sending complete with errors.")) # TRANSLATED
+        st.write(_t("Some emails failed to send. Please check the log below for details.")) # TRANSLATED
+    
     st.markdown("---")
     
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric(_t("Total Contacts"), total)
+        st.metric(_t("Total Contacts"), total) # TRANSLATED
     with col2:
-        st.metric(_t("Emails Successfully Sent"), suc)
+        st.metric(_t("Emails Successfully Sent"), suc) # TRANSLATED
     with col3:
-        st.metric(_t("Emails Failed to Send"), fail)
+        st.metric(_t("Emails Failed to Send"), fail) # TRANSLATED
 
     if st.session_state.email_sending_status:
         st.markdown("---")
-        with st.expander(_t("Show Activity Log and Errors")):
+        with st.expander(_t("Show Activity Log and Errors"), expanded=False): # TRANSLATED
             log_container = st.container(height=300)
             for log_entry in st.session_state.email_sending_status:
                 if "error" in log_entry.lower() or "failed" in log_entry.lower():
@@ -349,28 +450,49 @@ def page_results():
                 else:
                     log_container.info(log_entry)
 
+
+# --- Sidebar: Language Selection ---
+with st.sidebar:
+    st.image("https://images.unsplash.com/photo-1596551329241-e9702675d045?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w1MDcxMzJ8MHwxfHNlYXJjaHw3MHx8YWklMjBlbWFpbCUyMGFzc2lzdGFudHxlbnwwfHx8fDE3MjE4MzI2NzJ8MA&ixlib=rb-4.0.3&q=80&w=1080", width=100)
+    st.title(_t("AI Email Assistant")) # TRANSLATED
     st.markdown("---")
-    if st.button(_t("Start New Email Session"), use_container_width=True, key="start_new_session_button"):
-        # Clear all relevant session state variables
-        keys_to_clear = [
-            'initialized', 'language', 'page', 'contacts', 'contact_issues', 
-            'attachments', 'email_sending_status', 'sending_summary', 
-            'generation_in_progress', 'sending_in_progress', 'user_prompt', 
-            'user_email_context', 'personalize_emails', 'generic_greeting', 
-            'template_subject', 'template_body', 'editable_subject', 'editable_body',
-            'uploaded_file_name', 'show_generation_form'
-        ]
-        for k in keys_to_clear:
-            if k in st.session_state:
-                del st.session_state[k]
-        init_state() # Re-initialize to default states
-        st.rerun() # Force a rerun to restart the app
+    
+    # Language selection
+    chosen_language_code = st.selectbox(
+        _t("Select your language"), # TRANSLATED
+        options=list(LANGUAGES.keys()),
+        format_func=lambda x: LANGUAGES[x],
+        index=list(LANGUAGES.keys()).index(st.session_state.language),
+        key="language_selector"
+    )
+
+    if chosen_language_code != st.session_state.language:
+        st.session_state.language = chosen_language_code
+        set_language(chosen_language_code)
+        st.experimental_rerun() # Rerun app to apply new language immediately
 
 
-# --- Main Navigation ---
+# --- Main App Logic (Page Routing) ---
 if st.session_state.page == 'generate':
     page_generate()
 elif st.session_state.page == 'preview':
     page_preview()
-else: # 'results'
+elif st.session_state.page == 'results':
     page_results()
+
+# Cleanup temporary excel file if it exists and is not needed anymore
+# This needs to be carefully handled to avoid issues if files are still in use
+if st.session_state.get('excel_file_path') and st.session_state.page != 'generate':
+    try:
+        if os.path.exists(st.session_state.excel_file_path):
+            os.remove(st.session_state.excel_file_path)
+            st.session_state.excel_file_path = None # Clear the path
+    except OSError as e:
+        # File might still be in use by pandas or another process
+        # print(f"Could not remove temporary Excel file: {e}")
+        pass # Suppress error if file is in use. It will be cleaned up eventually.
+
+# Cleanup temporary attachment files (when session ends or app restarts)
+# This is tricky in Streamlit as sessions persist, but files should be removed eventually.
+# A more robust solution for temp files is often to use a directory that's cleared on app restart.
+# For now, let's keep the existing logic and rely on the OS to clean up /tmp.
