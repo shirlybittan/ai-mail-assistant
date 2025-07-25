@@ -26,70 +26,45 @@ def _log_failed_email_to_file(sender_email, to_email, subject, body, error_messa
     log_dir = os.path.dirname(log_path)
     if log_dir and not os.path.exists(log_dir):
         os.makedirs(log_dir)
-        
+
     with open(log_path, "a", encoding="utf-8") as f:
         f.write(log_entry)
 
-def send_email_message(sender_email, sender_password, to_email, subject, body, attachments=None, log_path="failed_emails.log"):
+def send_email_message(sender_email, sender_password, to_email, subject, body, log_path, attachments=None):
     """
-    Sends an email message with optional attachments using an SMTP server.
-
-    Args:
-        sender_email (str): The sender's email address.
-        sender_password (str): The sender's app password (for Google, Outlook, etc.).
-        to_email (str): The recipient's email address.
-        subject (str): The subject of the email.
-        body (str): The body content of the email, expected to be in HTML format.
-        attachments (list, optional): A list of file paths to attach. Defaults to None.
-        log_path (str, optional): Path to the file where failed emails should be logged.
-                                  Defaults to "failed_emails.log".
-
-    Returns:
-        dict: A dictionary with 'status' ("success" or "error") and 'message'.
+    Sends an email message with optional attachments using SMTP.
+    The body is now expected to be HTML.
     """
-    if not re.match(r"[^@]+@[^@]+\.[^@]+", to_email):
-        _log_failed_email_to_file(sender_email, to_email, subject, body, "Invalid recipient email format", log_path)
-        return {"status": "error", "message": "Invalid recipient email format."}
+    if attachments is None:
+        attachments = []
 
     msg = MIMEMultipart()
     msg['From'] = sender_email
     msg['To'] = to_email
     msg['Subject'] = subject
 
-    # --- FIX: Attach the body as HTML to preserve formatting ---
-    msg.attach(MIMEText(body, 'html'))
+    # Attach the HTML body
+    msg.attach(MIMEText(body, 'html')) # Changed 'plain' to 'html'
 
-    if attachments:
-        for attachment_path in attachments:
-            if not os.path.exists(attachment_path):
-                error_msg = f"Attachment file not found: {attachment_path}"
-                _log_failed_email_to_file(sender_email, to_email, subject, body, error_msg, log_path)
-                return {"status": "error", "message": error_msg}
-
-            try:
-                with open(attachment_path, "rb") as attachment:
-                    part = MIMEBase("application", "octet-stream")
-                    part.set_payload(attachment.read())
-                encoders.encode_base64(part)
-                part.add_header(
-                    "Content-Disposition",
-                    f"attachment; filename= {os.path.basename(attachment_path)}",
-                )
-                msg.attach(part)
-            except Exception as e:
-                error_msg = f"Failed to attach file {os.path.basename(attachment_path)}: {e}"
-                _log_failed_email_to_file(sender_email, to_email, subject, body, error_msg, log_path)
-                return {"status": "error", "message": error_msg}
+    for attachment_data, attachment_name in attachments:
+        part = MIMEBase('application', 'octet-stream')
+        part.set_payload(attachment_data)
+        encoders.encode_base64(part)
+        part.add_header('Content-Disposition', f'attachment; filename="{attachment_name}"')
+        msg.attach(part)
 
     try:
-        if "gmail.com" in sender_email:
+        smtp_server = ""
+        smtp_port = 0
+
+        # Determine SMTP server and port based on sender email domain
+        if "@gmail.com" in sender_email:
             smtp_server = "smtp.gmail.com"
             smtp_port = 587
-        elif "outlook.com" in sender_email or "hotmail.com" in sender_email:
-            smtp_server = "smtp.office365.com"
+        elif "@outlook.com" in sender_email or "@hotmail.com" in sender_email:
+            smtp_server = "smtp.office365.com" # Common for Outlook/Hotmail
             smtp_port = 587
         else:
-            _log_failed_email_to_file(sender_email, to_email, subject, body, "Unsupported sender email domain", log_path)
             return {"status": "error", "message": "Unsupported sender email domain. Only Gmail and Outlook/Hotmail are currently supported."}
 
         with smtplib.SMTP(smtp_server, smtp_port) as server:
@@ -111,6 +86,39 @@ def send_email_message(sender_email, sender_password, to_email, subject, body, a
         _log_failed_email_to_file(sender_email, to_email, subject, body, error_msg, log_path)
         return {"status": "error", "message": error_msg}
     except Exception as e:
-        error_msg = f"An unexpected error occurred during email sending: {e}"
+        error_msg = f"An unexpected error occurred: {e}. Ensure all inputs are valid."
         _log_failed_email_to_file(sender_email, to_email, subject, body, error_msg, log_path)
         return {"status": "error", "message": error_msg}
+
+if __name__ == '__main__':
+    # Example usage for testing
+    # You would typically get these from Streamlit secrets or environment variables
+    test_sender_email = os.getenv("GMAIL_USER")
+    test_sender_password = os.getenv("GMAIL_APP_PASSWORD") # Use app password for Gmail
+    test_to_email = "recipient@example.com"
+    test_subject = "Test HTML Email from Python"
+    test_body_html = """
+    <html>
+    <body>
+        <p>Hello <b>World</b>,</p>
+        <p>This is a test HTML email sent from a Python script.</p>
+        <p>Regards,<br>Your App</p>
+    </body>
+    </html>
+    """
+    test_log_path = "test_failed_emails.log"
+
+    print("Attempting to send test email...")
+    if test_sender_email and test_sender_password:
+        result = send_email_message(
+            sender_email=test_sender_email,
+            sender_password=test_sender_password,
+            to_email=test_to_email,
+            subject=test_subject,
+            body=test_body_html,
+            log_path=test_log_path,
+            attachments=[]
+        )
+        print(f"Test email result: {result}")
+    else:
+        print("Skipping email send test: GMAIL_USER or GMAIL_APP_PASSWORD not set in environment.")
