@@ -139,19 +139,24 @@ def page_generate():
     uploaded_file = st.file_uploader(
         _t("Upload Excel (.xlsx/.xls)"), type=["xlsx","xls"]
     )
+
+    current_file_id = None
     if uploaded_file is not None:
-        # Fix for AttributeError: 'NoneType' object has no attribute 'id'
-        # Ensure that uploaded_file has an 'id' before comparison
-        # This addresses the error observed in the traceback from the previous turn.
-        if st.session_state.last_uploaded_file_id is None or \
-           st.session_state.last_uploaded_file_id != uploaded_file.id:
-            # Only process if new file or if no file was previously uploaded
-            contacts, issues = load_contacts_from_excel(uploaded_file)
-            st.session_state.contacts = contacts
-            st.session_state.contact_issues = issues
-            st.session_state.uploaded_file = uploaded_file
-            st.session_state.last_uploaded_file_id = uploaded_file.id # Store the ID of the new file
-            st.session_state.show_generation = False
+        # Get the ID of the currently uploaded file safely
+        current_file_id = uploaded_file.id
+
+    # Process file only if it's a new upload or different from the last processed one
+    if current_file_id is not None and \
+       (st.session_state.last_uploaded_file_id is None or \
+        st.session_state.last_uploaded_file_id != current_file_id):
+        
+        # Only process if a new or different file has been uploaded
+        contacts, issues = load_contacts_from_excel(uploaded_file)
+        st.session_state.contacts = contacts
+        st.session_state.contact_issues = issues
+        st.session_state.uploaded_file = uploaded_file
+        st.session_state.last_uploaded_file_id = current_file_id # Store the ID of the new file
+        st.session_state.show_generation = False
 
     # --- Show results of upload ---
     if st.session_state.uploaded_file is not None:
