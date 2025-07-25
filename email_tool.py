@@ -1,5 +1,4 @@
 # email_tool.py
-
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -26,49 +25,74 @@ def _log_failed_email_to_file(sender_email, to_email, subject, body, error_messa
     log_dir = os.path.dirname(log_path)
     if log_dir and not os.path.exists(log_dir):
         os.makedirs(log_dir)
-        
+
     with open(log_path, "a", encoding="utf-8") as f:
         f.write(log_entry)
 
-def send_email_message(sender_email, sender_password, to_email, subject, body, attachments=None, log_path="failed_emails.log"):
+def send_email_message(sender_email, sender_password, to_email, subject, body, log_path, attachment_paths=None):
     """
-    Sends an email using SMTP with the provided credentials and content.
-    Supports Gmail and Outlook/Hotmail.
-    """
-    if attachments is None:
-        attachments = []
+    Sends an email message with attachments using SMTP.
 
-    # Determine SMTP server based on sender email domain
-    if "gmail.com" in sender_email:
-        smtp_server = "smtp.gmail.com"
-        smtp_port = 587
-    elif "outlook.com" in sender_email or "hotmail.com" in sender_email:
-        smtp_server = "smtp.office365.com" # Or smtp-mail.outlook.com
-        smtp_port = 587
-    else:
-        _log_failed_email_to_file(sender_email, to_email, subject, body, "Unsupported sender email domain", log_path)
-        return {"status": "error", "message": "Unsupported sender email domain. Only Gmail and Outlook/Hotmail are currently supported."}
+    Args:
+        sender_email (str): The email address of the sender.
+        sender_password (str): The password or app-specific password for the sender's email.
+        to_email (str): The recipient's email address.
+        subject (str): The subject of the email.
+        body (str): The body content of the email (plain text or markdown).
+        log_path (str): The file path to log failed email attempts.
+        attachment_paths (list): A list of file paths to attach to the email.
+
+    Returns:
+        dict: A dictionary indicating the status and a message.
+    """
+    if attachment_paths is None:
+        attachment_paths = []
+
+    msg = MIMEMultipart()
+    msg['From'] = sender_email
+    msg['To'] = to_email
+    msg['Subject'] = subject
+
+    # Convert newlines to <br> tags for HTML display
+    html_body = body.replace('\n', '<br>')
+    msg.attach(MIMEText(html_body, 'html')) # Send as HTML to preserve formatting
+
+    # Attach files
+    for attachment_path in attachment_paths:
+        if not os.path.exists(attachment_path):
+            error_msg = f"Attachment file not found: {attachment_path}"
+            _log_failed_email_to_file(sender_email, to_email, subject, body, error_msg, log_path)
+            return {"status": "error", "message": error_msg}
+
+        try:
+            with open(attachment_path, "rb") as attachment:
+                part = MIMEBase("application", "octet-stream")
+                part.set_payload(attachment.read())
+            encoders.encode_base64(part)
+            part.add_header(
+                "Content-Disposition",
+                f"attachment; filename= {os.path.basename(attachment_path)}",
+            )
+            msg.attach(part)
+        except Exception as e:
+            error_msg = f"Error attaching file {os.path.basename(attachment_path)}: {e}"
+            _log_failed_email_to_file(sender_email, to_email, subject, body, error_msg, log_path)
+            return {"status": "error", "message": error_msg}
 
     try:
-        msg = MIMEMultipart()
-        msg['From'] = sender_email
-        msg['To'] = to_email
-        msg['Subject'] = subject
+        # Determine SMTP server and port based on sender email domain
+        smtp_server = None
+        smtp_port = None
+        sender_domain = sender_email.split('@')[-1]
 
-        # Always send as HTML since the agent is now configured for it
-        msg.attach(MIMEText(body, 'html', 'utf-8')) # CHANGED: 'plain' to 'html'
-
-        # Attachments
-        for filepath in attachments:
-            if os.path.exists(filepath):
-                part = MIMEBase('application', 'octet-stream')
-                with open(filepath, 'rb') as file:
-                    part.set_payload(file.read())
-                encoders.encode_base64(part)
-                part.add_header('Content-Disposition', f'attachment; filename="{os.path.basename(filepath)}"')
-                msg.attach(part)
-            else:
-                print(f"Warning: Attachment file not found - {filepath}")
+        if "gmail.com" in sender_domain:
+            smtp_server = "smtp.gmail.com"
+            smtp_port = 587
+        elif "outlook.com" in sender_domain or "hotmail.com" in sender_domain:
+            smtp_server = "smtp-mail.outlook.com"
+            smtp_port = 587
+        else:
+            return {"status": "error", "message": "Unsupported sender email domain. Only Gmail and Outlook/Hotmail are currently supported."}
 
         with smtplib.SMTP(smtp_server, smtp_port) as server:
             server.starttls()
@@ -89,6 +113,6 @@ def send_email_message(sender_email, sender_password, to_email, subject, body, a
         _log_failed_email_to_file(sender_email, to_email, subject, body, error_msg, log_path)
         return {"status": "error", "message": error_msg}
     except Exception as e:
-        error_msg = f"An unexpected error occurred during email sending: {e}"
+        error_msg = f"An unexpected error occurred: {e}"
         _log_failed_email_to_file(sender_email, to_email, subject, body, error_msg, log_path)
         return {"status": "error", "message": error_msg}
