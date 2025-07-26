@@ -37,7 +37,8 @@ class SmartEmailAgent:
             dict: A dictionary containing 'subject' and 'body' of the generated email.
                   Returns {"subject": "Error", "body": "..."} on failure.
         """
-        system_message = f"""You are an AI assistant specialized in crafting professional and engaging email templates.
+        # --- FIX: Changed outer f-string delimiters from """ to ''' to avoid conflict with inner """ for markdown code blocks ---
+        system_message = f'''You are an AI assistant specialized in crafting professional and engaging email templates.
 Your task is to generate an email subject and body based on the user's prompt and additional context.
 The output MUST be in a JSON format with two keys: "subject" and "body".
 
