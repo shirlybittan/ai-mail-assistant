@@ -69,7 +69,10 @@ TRANSLATIONS = {
         "Not configured": "Not configured",
         "Sender email credentials are not configured. Please set SENDER_EMAIL and SENDER_PASSWORD in Streamlit secrets.": "Sender email credentials are not configured. Please set SENDER_EMAIL and SENDER_PASSWORD in Streamlit secrets.",
         "Valued Customer": "Valued Customer", # New fallback generic greeting
-        "Language": "Language" # For the sidebar selectbox label
+        "Language": "Language", # For the sidebar selectbox label
+        "Dear": "Dear", # Added for dynamic salutation prefix
+        "Edit the email template here. Changes will reflect in the live preview.": "Edit the email template here. Changes will reflect in the live preview.", # New info text for editable section
+        "This shows how the email will appear for the first contact. To make changes, use the 'Editable Email Content' section on the left.": "This shows how the email will appear for the first contact. To make changes, use the 'Editable Email Content' section on the left." # New info text for preview section
     },
     "fr": {
         "AI Email Assistant": "Assistant d'E-mail IA",
@@ -127,12 +130,15 @@ TRANSLATIONS = {
         "Emails Failed to Send": "E-mails échoués",
         "Show Activity Log and Errors": "Afficher le journal d'activité et les erreurs",
         "Start New Email Session": "Commencer une nouvelle session d'e-mail",
-        "No emails were processed.": "Aucun e-mail n'a été traité.",
+        "No emails were processed.\n": "Aucun e-mail n'a été traité.",
         "Sender Email": "E-mail de l'expéditeur",
         "Not configured": "Non configuré",
         "Sender email credentials are not configured. Please set SENDER_EMAIL and SENDER_PASSWORD in Streamlit secrets.": "Les identifiants de l'expéditeur ne sont pas configurés. Veuillez définir SENDER_EMAIL et SENDER_PASSWORD dans les secrets de Streamlit.",
         "Valued Customer": "Cher Client",
-        "Language": "Langue"
+        "Language": "Langue",
+        "Dear": "Bonjour", # Added for dynamic salutation prefix (translated to Bonjour for French)
+        "Edit the email template here. Changes will reflect in the live preview.": "Modifiez le modèle d'e-mail ici. Les modifications se refléteront dans l'aperçu en direct.",
+        "This shows how the email will appear for the first contact. To make changes, use the 'Editable Email Content' section on the left.": "Ceci montre l'apparence de l'e-mail pour le premier contact. Pour apporter des modifications, utilisez la section 'Contenu de l'e-mail modifiable' sur la gauche."
     }
 }
 
@@ -156,4 +162,14 @@ def _t(key, **kwargs):
     If the key is not found, it returns the key itself as a fallback.
     """
     translation = TRANSLATIONS.get(_selected_lang, {}).get(key, key)
-    return translation.format(**kwargs)
+    try:
+        # Attempt to format the string with provided keyword arguments
+        return translation.format(**kwargs)
+    except KeyError as e:
+        # Log or handle cases where a placeholder is missing in the translation string
+        # For now, we'll just return the unformatted translation with a warning.
+        print(f"Translation Error: Missing placeholder {e} for key '{key}' in language '{_selected_lang}'. Original translation: '{translation}'")
+        return translation # Return unformatted string if formatting fails
+    except IndexError as e:
+        print(f"Translation Error: Index error {e} for key '{key}' in language '{_selected_lang}'. Original translation: '{translation}'")
+        return translation # Return unformatted string if formatting fails
