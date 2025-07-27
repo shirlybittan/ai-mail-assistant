@@ -44,7 +44,7 @@ def init_state():
         st.session_state.page = 'generate'
         st.session_state.contacts = []
         st.session_state.contact_issues = []
-        st.session_state.attachments = []
+        st.session_state.attachments = [] # Stores UploadedFile objects
         st.session_state.email_sending_status = []
         st.session_state.sending_summary = {'total_contacts':0, 'successful':0, 'failed':0}
         st.session_state.generation_in_progress = False
@@ -174,79 +174,91 @@ def send_all_emails():
     progress_text = _t("Sending emails. Please wait.")
     my_bar = st.progress(0, text=progress_text)
 
-    for i, contact in enumerate(st.session_state.contacts):
-        # Update progress bar
-        progress_percentage = (i + 1) / total_contacts
-        my_bar.progress(progress_percentage, text=f"{progress_text} ({i+1}/{total_contacts})")
+    temp_attachment_paths = [] # To store paths of temporary attachment files
 
-        if not contact.get('email'):
-            msg = f"Skipped: Contact without email - {contact.get('name', 'N/A')}"
-            status.append(msg)
-            fail += 1
-            continue
-
-        email = contact['email']
-        
-        subj = st.session_state.editable_subject
-        body = st.session_state.editable_body # Body already contains generic greeting if generic
-
-        # Apply personalization to subject and body if needed
-        if st.session_state.personalize_emails:
-            actual_greeting = contact.get('name', '')
-            contact_email = contact.get('email', '')
-
-            # Replace placeholders for Name/Nom
-            for placeholder in ["{{Name}}", "{{Nom}}"]:
-                subj = subj.replace(placeholder, actual_greeting)
-                body = body.replace(placeholder, actual_greeting)
-
-            # Replace placeholders for Email/Courriel
-            for placeholder in ["{{Email}}", "{{Courriel}}"]:
-                subj = subj.replace(placeholder, contact_email)
-                body = body.replace(placeholder, contact_email)
-        else:
-            # For generic emails, ensure subject does not contain {{Name}} or {{Email}}
-            # These should already be handled if the AI agent inserts them, but this is a safeguard.
-            subj = subj.replace("{{Name}}", "").replace("{{Email}}", "").replace("{{Nom}}", "").replace("{{Courriel}}", "")
-            body = body.replace("{{Name}}", "").replace("{{Email}}", "").replace("{{Nom}}", "").replace("{{Courriel}}", "")
-
-
-        sender_info = SENDER_EMAIL
-
-        # Attempt to send email
+    # Create a temporary directory for attachments
+    with tempfile.TemporaryDirectory() as temp_dir:
         try:
-            result = send_email_message(
-                sender_email=SENDER_EMAIL,
-                sender_password=SENDER_PASSWORD,
-                to_email=email,
-                subject=subj,
-                body=body,
-                attachments=st.session_state.attachments,
-                log_path=FAILED_EMAILS_LOG_PATH
-            )
-            if result.get('status') == 'success':
-                msg = f"Success: {contact.get('name', email)} <{email}>" # Use contact name or email for log
-                success += 1
-            else:
-                msg = f"Error: {contact.get('name', email)} <{email}> - {result.get('message')}"
-                fail += 1
-            status.append(msg)
-        except Exception as e:
-            msg = f"Error: {contact.get('name', email)} <{email}> - {str(e)}"
-            status.append(msg)
-            fail += 1
+            # Save uploaded attachments to temporary files
+            for uploaded_file in st.session_state.attachments:
+                temp_file_path = os.path.join(temp_dir, uploaded_file.name)
+                with open(temp_file_path, "wb") as f:
+                    f.write(uploaded_file.getbuffer())
+                temp_attachment_paths.append(temp_file_path)
 
-    my_bar.empty() # Clear the progress bar after completion
+            for i, contact in enumerate(st.session_state.contacts):
+                # Update progress bar
+                progress_percentage = (i + 1) / total_contacts
+                my_bar.progress(progress_percentage, text=f"{progress_text} ({i+1}/{total_contacts})")
 
-    st.session_state.email_sending_status = status
-    st.session_state.sending_summary = {
-        'total_contacts': total_contacts,
-        'successful': success,
-        'failed': fail
-    }
-    st.session_state.page = 'results'
-    st.session_state.sending_in_progress = False
-    st.rerun()
+                if not contact.get('email'):
+                    msg = f"Skipped: Contact without email - {contact.get('name', 'N/A')}"
+                    status.append(msg)
+                    fail += 1
+                    continue
+
+                email = contact['email']
+                
+                subj = st.session_state.editable_subject
+                body = st.session_state.editable_body # Body already contains generic greeting if generic
+
+                # Apply personalization to subject and body if needed
+                if st.session_state.personalize_emails:
+                    actual_greeting = contact.get('name', '')
+                    contact_email = contact.get('email', '')
+
+                    # Replace placeholders for Name/Nom
+                    for placeholder in ["{{Name}}", "{{Nom}}"]:
+                        subj = subj.replace(placeholder, actual_greeting)
+                        body = body.replace(placeholder, actual_greeting)
+
+                    # Replace placeholders for Email/Courriel
+                    for placeholder in ["{{Email}}", "{{Courriel}}"]:
+                        subj = subj.replace(placeholder, contact_email)
+                        body = body.replace(placeholder, contact_email)
+                else:
+                    # For generic emails, ensure subject does not contain {{Name}} or {{Email}}
+                    # These should already be handled if the AI agent inserts them, but this is a safeguard.
+                    subj = subj.replace("{{Name}}", "").replace("{{Email}}", "").replace("{{Nom}}", "").replace("{{Courriel}}", "")
+                    body = body.replace("{{Name}}", "").replace("{{Email}}", "").replace("{{Nom}}", "").replace("{{Courriel}}", "")
+
+
+                sender_info = SENDER_EMAIL
+
+                # Attempt to send email
+                try:
+                    result = send_email_message(
+                        sender_email=SENDER_EMAIL,
+                        sender_password=SENDER_PASSWORD,
+                        to_email=email,
+                        subject=subj,
+                        body=body,
+                        attachments=temp_attachment_paths, # Pass the paths of temporary files
+                        log_path=FAILED_EMAILS_LOG_PATH
+                    )
+                    if result.get('status') == 'success':
+                        msg = f"Success: {contact.get('name', email)} <{email}>" # Use contact name or email for log
+                        success += 1
+                    else:
+                        msg = f"Error: {contact.get('name', email)} <{email}> - {result.get('message')}"
+                        fail += 1
+                    status.append(msg)
+                except Exception as e:
+                    msg = f"Error: {contact.get('name', email)} <{email}> - {str(e)}"
+                    status.append(msg)
+                    fail += 1
+        finally:
+            my_bar.empty() # Clear the progress bar after completion
+
+            st.session_state.email_sending_status = status
+            st.session_state.sending_summary = {
+                'total_contacts': total_contacts,
+                'successful': success,
+                'failed': fail
+            }
+            st.session_state.page = 'results'
+            st.session_state.sending_in_progress = False
+            st.rerun()
 
 # --- Page: Generate ---
 def page_generate():
@@ -438,7 +450,7 @@ def page_preview():
                 # Clear previous attachments if new ones are uploaded
                 # st.session_state.attachments = [] # Decide if you want to replace or append
                 for uploaded_file in uploaded_attachments:
-                    # Check if file is already in attachments to avoid duplicates
+                    # Check if file is already in attachments to avoid duplicates by name
                     if not any(att.name == uploaded_file.name for att in st.session_state.attachments):
                         st.session_state.attachments.append(uploaded_file)
                 st.info(_t("Attachments selected: {count}").format(count=len(st.session_state.attachments)))
