@@ -1,0 +1,24 @@
+Timestamp: 2025-07-27 16:20:44
+Sender: asso.migdal@gmail.com
+Recipient: shirlybittan@gmail.com
+Subject: Invitation au Gala Annuel de Bienfaisance
+Error: An unexpected error occurred during email sending: _path_exists: path should be string, bytes, os.PathLike or integer, not UploadedFile
+Body Snippet (first 200 chars): Cher/Chère Alice Smith,
+
+Nous avons le plaisir de vous inviter à notre Gala Annuel de Bienfaisance qui se tiendra le {{Date}} à {{Heure}}. L'événement aura lieu au {{Lieu}}.
+
+Votre présence serait un ...
+--------------------------------------------------
+
+Timestamp: 2025-07-27 16:20:44
+Sender: asso.migdal@gmail.com
+Recipient: bittanshirly@gmail.com
+Subject: Invitation au Gala Annuel de Bienfaisance
+Error: An unexpected error occurred during email sending: _path_exists: path should be string, bytes, os.PathLike or integer, not UploadedFile
+Body Snippet (first 200 chars): Cher/Chère Bob Johnson,
+
+Nous avons le plaisir de vous inviter à notre Gala Annuel de Bienfaisance qui se tiendra le {{Date}} à {{Heure}}. L'événement aura lieu au {{Lieu}}.
+
+Votre présence serait un ...
+--------------------------------------------------
+

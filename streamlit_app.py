@@ -150,7 +150,7 @@ def generate_email_preview_and_template():
     st.session_state.editable_subject = template['subject']
     st.session_state.editable_body = template['body']
 
-    # NEW: Apply greeting to editable_body if not personalizing
+    # Apply greeting to editable_body only if not personalizing
     if not st.session_state.personalize_emails:
         actual_greeting = st.session_state.generic_greeting if st.session_state.generic_greeting else _t("Valued Customer")
         st.session_state.editable_body = _add_greeting_to_body(
@@ -188,17 +188,28 @@ def send_all_emails():
         email = contact['email']
         
         subj = st.session_state.editable_subject
-        body = st.session_state.editable_body # Body already contains greeting if generic
+        body = st.session_state.editable_body # Body already contains generic greeting if generic
 
         # Apply personalization to subject and body if needed
         if st.session_state.personalize_emails:
-            # Determine the greeting to be used for personalization
             actual_greeting = contact.get('name', '')
-            subj = subj.replace("{{Name}}", actual_greeting).replace("{{Email}}", contact.get('email', ''))
-            body = body.replace("{{Name}}", actual_greeting).replace("{{Email}}", contact.get('email', ''))
+            contact_email = contact.get('email', '')
+
+            # Replace placeholders for Name/Nom
+            for placeholder in ["{{Name}}", "{{Nom}}"]:
+                subj = subj.replace(placeholder, actual_greeting)
+                body = body.replace(placeholder, actual_greeting)
+
+            # Replace placeholders for Email/Courriel
+            for placeholder in ["{{Email}}", "{{Courriel}}"]:
+                subj = subj.replace(placeholder, contact_email)
+                body = body.replace(placeholder, contact_email)
         else:
             # For generic emails, ensure subject does not contain {{Name}} or {{Email}}
-            subj = subj.replace("{{Name}}", "").replace("{{Email}}", "") # Just in case
+            # These should already be handled if the AI agent inserts them, but this is a safeguard.
+            subj = subj.replace("{{Name}}", "").replace("{{Email}}", "").replace("{{Nom}}", "").replace("{{Courriel}}", "")
+            body = body.replace("{{Name}}", "").replace("{{Email}}", "").replace("{{Nom}}", "").replace("{{Courriel}}", "")
+
 
         sender_info = SENDER_EMAIL
 
@@ -395,13 +406,18 @@ def page_preview():
                 preview_body = st.session_state.editable_body # Body already contains generic greeting if applicable
 
                 if st.session_state.personalize_emails:
-                    # Replace {{Name}} and {{Email}} placeholders with actual contact data
-                    # Only do this if personalizing. Generic emails should not have these placeholders.
-                    preview_subj = preview_subj.replace("{{Name}}", preview_name).replace("{{Email}}", preview_email)
-                    preview_body = preview_body.replace("{{Name}}", preview_name).replace("{{Email}}", preview_email)
+                    # Replace {{Name}}, {{Nom}}, {{Email}}, {{Courriel}} placeholders with actual contact data
+                    for placeholder in ["{{Name}}", "{{Nom}}"]:
+                        preview_subj = preview_subj.replace(placeholder, preview_name)
+                        preview_body = preview_body.replace(placeholder, preview_name)
+
+                    for placeholder in ["{{Email}}", "{{Courriel}}"]:
+                        preview_subj = preview_subj.replace(placeholder, preview_email)
+                        preview_body = preview_body.replace(placeholder, preview_email)
                 else:
-                    # For generic emails, ensure subject does not contain {{Name}} or {{Email}}
-                    preview_subj = preview_subj.replace("{{Name}}", "").replace("{{Email}}", "")
+                    # For generic emails, ensure subject and body do not contain any personalization placeholders
+                    preview_subj = preview_subj.replace("{{Name}}", "").replace("{{Email}}", "").replace("{{Nom}}", "").replace("{{Courriel}}", "")
+                    preview_body = preview_body.replace("{{Name}}", "").replace("{{Email}}", "").replace("{{Nom}}", "").replace("{{Courriel}}", "")
 
                 st.text_input(_t("Recipient"), value=f"{preview_name} <{preview_email}>") # Removed disabled=True
                 st.text_input(_t("Subject"), value=preview_subj) # Removed disabled=True
