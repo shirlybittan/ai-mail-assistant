@@ -480,7 +480,7 @@ def page_results():
     st.markdown("---")
     if total > 0 and successful == total:
         st.success(_t("All emails sent successfully!"))
-        st.write(_t("All {count} emails were sent without any issues.").format(count=total))
+        st.write(_t("All {count} emails were sent without any issues.", count=total))
     elif total > 0:
         st.warning(_t("Sending complete with errors."))
         st.write(_t("Some emails failed to send. Please check the log below for details."))
