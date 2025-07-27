@@ -33,60 +33,70 @@ class SmartEmailAgent:
 
         Returns:
             dict: A dictionary containing 'subject' and 'body' of the generated email template.
+                  Returns error message if generation fails.
         """
-
+        
         personalization_hint = ""
         if personalize_emails:
-            personalization_hint = "Include personalization placeholders like '{{Name}}' for the recipient's name and '{{Email}}' for their email address where appropriate."
+            # If personalization is ON, instruct AI to use placeholders.
+            personalization_hint = "INCLUDE specific name and email placeholders where appropriate (e.g., 'Dear {{Name}}', 'contact us at {{Email}}')."
         else:
-            personalization_hint = "DO NOT include specific name or email placeholders like '{{Name}}' or '{{Email}}'. Use a generic greeting if necessary, but avoid explicit personalization markers."
+            # If personalization is OFF, instruct AI NOT to use placeholders and NOT to include a greeting.
+            # The application will prepend a generic greeting later.
+            personalization_hint = "DO NOT include any name or email placeholders (like '{{Name}}' or '{{Email}}'). DO NOT include any salutation (e.g., 'Dear', 'Hello', 'Bonjour', 'Salut'). Start directly with the main body of the email content. The application will add a generic greeting or salutation if necessary."
 
+        system_message = (
+            "You are an AI assistant specialized in drafting professional and effective email templates. "
+            "Your task is to generate an email subject and body based on the user's instructions. "
+            "The output MUST be a JSON object with two keys: 'subject' and 'body'. "
+            f"The email should be in {output_language} language.\n\n"
+            "Here are the rules for generating the email:\n"
+            f"- {personalization_hint}\n"
+            "- Ensure the email content is relevant to the prompt and context.\n"
+            "- The 'body' should be a single string, including paragraph breaks (use '\\n\\n' for new paragraphs).\n"
+            "- Avoid conversational filler like 'Here is the email:' or 'Subject: ... Body: ...'."
+        )
 
-        system_message = f"""
-        You are an expert email marketing assistant. Your task is to craft a professional email template based on the user's instructions.
-        The output must be a JSON object with two keys: "subject" and "body".
-        Ensure the body uses standard newlines (\\n) for paragraphs and line breaks, not HTML tags like <p> or <br>.
-        {personalization_hint}
-        The email should be in {output_language}."""
-
-        user_message_content = f"Instructions: {prompt}\n"
+        user_message_content = f"User's request: {prompt}"
         if user_email_context:
-            user_message_content += f"Additional context/style: {user_email_context}"
+            user_message_content += f"\nAdditional context/style: {user_email_context}"
 
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
-                response_format={"type": "json_object"},
                 messages=[
                     {"role": "system", "content": system_message},
                     {"role": "user", "content": user_message_content}
-                ]
+                ],
+                response_format={"type": "json_object"}
             )
-
-            email_content = response.choices[0].message.content
-            parsed_content = json.loads(email_content)
             
-            # Sanitize the output to ensure placeholders are correct and valid
-            # Also, remove any residual HTML paragraph tags if the model occasionally generates them
-            sanitized_subject = re.sub(r'\{([A-Za-z]+)\}', r'{{\1}}', parsed_content.get("subject", "No Subject Generated"))
-            sanitized_body = re.sub(r'\{([A-Za-z]+)\}', r'{{\1}}', parsed_content.get("body", "No Body Generated"))
-            
-            # Remove <p> and </p> tags and replace with newlines for better plain text handling
-            sanitized_body = sanitized_body.replace('<p>', '').replace('</p>', '\n\n').strip()
-            # Replace <br> tags with newlines
-            sanitized_body = sanitized_body.replace('<br>', '\n').strip()
-            # Ensure proper line breaks are used, especially for lists or sequential paragraphs
-            sanitized_body = re.sub(r'\n\s*\n', '\n\n', sanitized_body) # Collapse multiple newlines to just two
+            # Extract content and parse JSON
+            response_content = response.choices[0].message.content
+            email_template = json.loads(response_content)
 
-            return {
-                "subject": sanitized_subject,
-                "body": sanitized_body
-            }
+            # Basic validation
+            if "subject" not in email_template or "body" not in email_template:
+                raise ValueError("AI response missing 'subject' or 'body' key.")
+            
+            # Clean up body to remove potential leading/trailing whitespace or accidental AI salutations
+            email_template['body'] = email_template['body'].strip()
+            # Further refinement: Remove common salutations if they accidentally slipped through
+            # This is a fallback in case the AI ignores the system prompt.
+            common_salutations_regex = r"^(Dear|Hello|Hi|Bonjour|Salut|Chers?|Cher|Chère)\s+[^,\n]*[,!.]?\s*\n\n*"
+            email_template['body'] = re.sub(common_salutations_regex, "", email_template['body'], flags=re.IGNORECASE | re.MULTILINE)
+            email_template['body'] = email_template['body'].strip()
+
+
+            return email_template
+
+        except json.JSONDecodeError as e:
+            return {"subject": "Error", "body": f"Failed to parse AI response (JSON error): {e}. Raw: {response_content}"}
+        except ValueError as e:
+            return {"subject": "Error", "body": f"AI response validation error: {e}. Raw: {response_content}"}
         except openai.APIError as e:
-            print(f"OpenAI API Error: {e}")
-            return {"subject": "Error", "body": f"Error generating email: {e}"}
+            return {"subject": "Error", "body": f"OpenAI API Error: {e}"}
         except Exception as e:
-            print(f"An unexpected error occurred: {e}")
             return {"subject": "Error", "body": f"An unexpected error occurred: {e}"}
 
 
@@ -118,5 +128,14 @@ if __name__ == '__main__':
         output_language="fr",
         personalize_emails=False
     )
-    print("Subject (Generic - FR):", template_generic["subject"])
-    print("Body (Generic - FR):\n", template_generic["body"])
+    print("Subject (Generic):", template_generic["subject"])
+    print("Body (Generic):\n", template_generic["body"])
+
+    print("\n--- Testing Template Agent (Generic with existing Salutation in prompt - should be removed by AI) ---")
+    template_generic_with_salutation_prompt = agent.generate_email_template(
+        "Write an email about a new discount. Start with 'Hello Team,'.",
+        output_language="en",
+        personalize_emails=False
+    )
+    print("Subject (Generic, prompt with Salutation):", template_generic_with_salutation_prompt["subject"])
+    print("Body (Generic, prompt with Salutation):\n", template_generic_with_salutation_prompt["body"])
