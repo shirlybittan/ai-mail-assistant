@@ -340,7 +340,8 @@ def page_generate():
             _t("Generate Email"),
             use_container_width=True,
             key="generate_email_button",
-            disabled=st.session_state.generation_in_progress
+            disabled=st.session_state.generation_in_progress,
+            type="primary"
         ):
             if st.session_state.user_prompt:
                 generate_email_preview_and_template()
@@ -364,7 +365,7 @@ def page_generate():
             key="generated_body_input"
         )
         st.markdown("---")
-        if st.button(_t("Proceed to Preview & Send"), use_container_width=True, key="proceed_to_preview_button"):
+        if st.button(_t("Proceed to Preview & Send"), use_container_width=True, key="proceed_to_preview_button", type="primary"):
             st.session_state.page = 'preview'
             st.rerun()
 
@@ -391,7 +392,7 @@ def page_preview():
         )
         st.markdown("---")
         # Button to go back to generation
-        if st.button(_t("Back to Generation"), use_container_width=True, key="back_to_generation_button"):
+        if st.button(_t("Back to Generation"), use_container_width=True, key="back_to_generation_button", type="primary"):
             st.session_state.page = 'generate'
             st.rerun()
 
@@ -458,7 +459,7 @@ def page_preview():
 
 
     st.markdown("---")
-    if st.button(_t("Confirm Send"), use_container_width=True, key="confirm_send_button", disabled=st.session_state.sending_in_progress):
+    if st.button(_t("Confirm Send"), use_container_width=True, key="confirm_send_button", disabled=st.session_state.sending_in_progress, type="primary"):
         if not st.session_state.contacts:
             st.warning(_t("No contacts loaded to send emails to."))
         elif not st.session_state.editable_subject or not st.session_state.editable_body:
@@ -510,7 +511,7 @@ def page_results():
                     log_display_container.info(log_entry)
 
     st.markdown("---")
-    if st.button(_t("Start New Email Session"), use_container_width=True, key="start_new_session_button"):
+    if st.button(_t("Start New Email Session"), use_container_width=True, key="start_new_session_button", type="primary"):
         # Clear all relevant session state variables
         keys_to_clear = [
             'initialized', 'language', 'page', 'contacts', 'contact_issues', 
