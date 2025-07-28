@@ -81,12 +81,31 @@ set_language(st.session_state.language)
 
 # --- UI Helpers ---
 def render_step_indicator(current_step: int):
-    steps = [_t("1. Generation"), _t("2. Preview"), _t("3. Results")]
-    cols = st.columns(len(steps))
-    for idx, label in enumerate(steps, start=1):
-        text = f"▶ **{label}**" if idx == current_step else label
-        with cols[idx-1]:
-            st.markdown(f"<p style='text-align: center;'>{text}</p>", unsafe_allow_html=True) # Center align steps
+    steps = [
+        {"label": _t("Generation & Setup"), "number": 1},
+        {"label": _t("Preview & Send"), "number": 2},
+        {"label": _t("Results"), "number": 3},
+    ]
+    step_html = "<div style='display: flex; justify-content: center; align-items: flex-start; gap: 60px; margin-bottom: 2rem;'>"
+    for idx, step in enumerate(steps, start=1):
+        if idx < current_step:
+            # Completed step: green circle with checkmark
+            circle = f"<div style='background: #22c55e; color: white; border-radius: 50%; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.07); border: 2px solid #22c55e;'>✓</div>"
+            label_color = "#22c55e"
+        elif idx == current_step:
+            # Current step: blue circle with number
+            circle = f"<div style='background: #2563eb; color: white; border-radius: 50%; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.07); border: 2px solid #2563eb;'>{step['number']}</div>"
+            label_color = "#2563eb"
+        else:
+            # Upcoming step: gray circle with number
+            circle = f"<div style='background: #e5e7eb; color: #9ca3af; border-radius: 50%; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 2px solid #e5e7eb;'>{step['number']}</div>"
+            label_color = "#9ca3af"
+        step_html += f"<div style='display: flex; flex-direction: column; align-items: center; min-width: 90px;'>"
+        step_html += circle
+        step_html += f"<div style='margin-top: 0.5rem; font-size: 1rem; color: {label_color}; text-align: center; font-weight: {'bold' if idx == current_step else 'normal'};'>{step['label']}</div>"
+        step_html += "</div>"
+    step_html += "</div>"
+    st.markdown(step_html, unsafe_allow_html=True)
 
 # --- Helper function for adding greeting ---
 def _add_greeting_to_body(body_content, greeting_text, current_language):
@@ -155,6 +174,7 @@ def generate_email_preview_and_template():
         
     st.session_state.generation_in_progress = False
     st.session_state.email_generated = True # Set flag to show generated email fields
+    st.session_state.page = 'preview' # Set page to preview after generation
     st.rerun() # Rerun to display the generated email
 
 def send_all_emails():
@@ -292,7 +312,7 @@ def page_generate():
                 st.info(f"  - {issue}")
         
         if contacts:
-            st.success(_t("Successfully loaded {count} valid contacts.").format(count=len(contacts)))
+            st.success(_t("Successfully loaded {count} valid contacts.", count=len(contacts)))
         else:
             st.error(_t("No valid contacts found in the Excel file."))
             st.session_state.show_generation_section = False # Hide generation if no contacts
@@ -348,26 +368,6 @@ def page_generate():
             else:
                 st.warning(_t("Please provide instructions for the AI to generate the email."))
 
-    # Display generated email fields only after generation
-    if st.session_state.email_generated:
-        st.success(_t("Your email has been generated! You can modify it below."))
-        st.markdown(f"**{_t('Subject')}**")
-        st.session_state.editable_subject = st.text_input(
-            _t("Subject"),
-            value=st.session_state.editable_subject,
-            key="generated_subject_input"
-        )
-        st.markdown(f"**{_t('Body')}**")
-        st.session_state.editable_body = st.text_area(
-            _t("Body"),
-            value=st.session_state.editable_body,
-            height=350,
-            key="generated_body_input"
-        )
-        st.markdown("---")
-        if st.button(_t("Proceed to Preview & Send"), use_container_width=True, key="proceed_to_preview_button", type="primary"):
-            st.session_state.page = 'preview'
-            st.rerun()
 
 # --- Page: Preview ---
 def page_preview():
@@ -444,7 +444,7 @@ def page_preview():
                 # Check if file is already in attachments to avoid duplicates by name
                 if not any(att.name == uploaded_file.name for att in st.session_state.attachments):
                     st.session_state.attachments.append(uploaded_file)
-            st.info(_t("Attachments selected: {count}").format(count=len(st.session_state.attachments)))
+            st.info(_t("Attachments selected: {count}", count=len(st.session_state.attachments)))
         
         if st.session_state.attachments:
             st.markdown(f"**{_t('Current Attachments')}**")
