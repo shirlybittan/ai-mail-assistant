@@ -155,6 +155,7 @@ def generate_email_preview_and_template():
         
     st.session_state.generation_in_progress = False
     st.session_state.email_generated = True # Set flag to show generated email fields
+    st.session_state.page = 'preview' # Set page to preview after generation
     st.rerun() # Rerun to display the generated email
 
 def send_all_emails():
@@ -348,26 +349,6 @@ def page_generate():
             else:
                 st.warning(_t("Please provide instructions for the AI to generate the email."))
 
-    # Display generated email fields only after generation
-    if st.session_state.email_generated:
-        st.success(_t("Your email has been generated! You can modify it below."))
-        st.markdown(f"**{_t('Subject')}**")
-        st.session_state.editable_subject = st.text_input(
-            _t("Subject"),
-            value=st.session_state.editable_subject,
-            key="generated_subject_input"
-        )
-        st.markdown(f"**{_t('Body')}**")
-        st.session_state.editable_body = st.text_area(
-            _t("Body"),
-            value=st.session_state.editable_body,
-            height=350,
-            key="generated_body_input"
-        )
-        st.markdown("---")
-        if st.button(_t("Proceed to Preview & Send"), use_container_width=True, key="proceed_to_preview_button", type="primary"):
-            st.session_state.page = 'preview'
-            st.rerun()
 
 # --- Page: Preview ---
 def page_preview():
