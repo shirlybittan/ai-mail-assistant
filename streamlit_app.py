@@ -312,7 +312,7 @@ def page_generate():
                 st.info(f"  - {issue}")
         
         if contacts:
-            st.success(_t("Successfully loaded {count} valid contacts.").format(count=len(contacts)))
+            st.success(_t("Successfully loaded {count} valid contacts.", count=len(contacts)))
         else:
             st.error(_t("No valid contacts found in the Excel file."))
             st.session_state.show_generation_section = False # Hide generation if no contacts
@@ -444,7 +444,7 @@ def page_preview():
                 # Check if file is already in attachments to avoid duplicates by name
                 if not any(att.name == uploaded_file.name for att in st.session_state.attachments):
                     st.session_state.attachments.append(uploaded_file)
-            st.info(_t("Attachments selected: {count}").format(count=len(st.session_state.attachments)))
+            st.info(_t("Attachments selected: {count}", count=len(st.session_state.attachments)))
         
         if st.session_state.attachments:
             st.markdown(f"**{_t('Current Attachments')}**")
