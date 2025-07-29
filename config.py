@@ -9,14 +9,12 @@ APP_CREDENTIALS = st.secrets.get("app_credentials", {})
 
 # Extract individual credentials from the APP_CREDENTIALS dictionary
 SENDER_EMAIL = APP_CREDENTIALS.get("SENDER_EMAIL")
-SENDER_PASSWORD = APP_CREDENTIALS.get("SENDER_PASSWORD")
+# SENDER_PASSWORD is no longer needed for Brevo API authentication.
 OPENAI_API_KEY = APP_CREDENTIALS.get("OPENAI_API_KEY")
+BREVO_API_KEY = APP_CREDENTIALS.get("BREVO_API_KEY")
 
-# Now, create the SENDER_CREDENTIALS dictionary that your app expects
-# It will contain only one email for now, if SENDER_EMAIL and SENDER_PASSWORD are found.
-SENDER_CREDENTIALS = {}
-if SENDER_EMAIL and SENDER_PASSWORD:
-    SENDER_CREDENTIALS[SENDER_EMAIL] = SENDER_PASSWORD
+# The SENDER_CREDENTIALS dictionary is also no longer necessary
+# as Brevo uses API keys for authentication.
 
 # --- LOGGING CONFIGURATION ---
 # Path for logging failed email attempts. This is not a secret.

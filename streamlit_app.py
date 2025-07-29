@@ -5,7 +5,7 @@ import pandas as pd
 from data_handler import load_contacts_from_excel
 from email_agent import SmartEmailAgent
 from email_tool import send_email_message
-from config import SENDER_EMAIL, SENDER_PASSWORD, OPENAI_API_KEY, FAILED_EMAILS_LOG_PATH
+from config import SENDER_EMAIL, OPENAI_API_KEY, FAILED_EMAILS_LOG_PATH, BREVO_API_KEY
 from translations import LANGUAGES, _t, set_language
 import datetime
 import os
@@ -242,12 +242,12 @@ def send_all_emails():
                 try:
                     result = send_email_message(
                         sender_email=SENDER_EMAIL,
-                        sender_password=SENDER_PASSWORD,
+                        sender_name=SENDER_EMAIL.split('@')[0].replace('.', ' ').title(),
                         to_email=email,
+                        to_name=contact.get('name', ''),
                         subject=subj,
                         body=body,
-                        attachments=temp_attachment_paths, # Pass the paths of temporary files
-                        log_path=FAILED_EMAILS_LOG_PATH
+                        attachments=temp_attachment_paths
                     )
                     if result.get('status') == 'success':
                         msg = f"Success: {contact.get('name', email)} <{email}>" # Use contact name or email for log
@@ -281,7 +281,7 @@ def page_generate():
     # --- Sender Information (Always visible at the top) ---
     st.markdown("---")
     st.markdown(f"**{_t('Sender Email')}:** `{SENDER_EMAIL if SENDER_EMAIL else _t('Not configured')}`")
-    if not SENDER_EMAIL or not SENDER_PASSWORD:
+    if not SENDER_EMAIL or not BREVO_API_KEY:
         st.warning(_t("Sender email credentials are not configured. Please set SENDER_EMAIL and SENDER_PASSWORD in Streamlit secrets."))
     st.markdown("---")
 

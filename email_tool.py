@@ -1,16 +1,15 @@
 # email_tool.py
 
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
-from email import encoders
 import datetime
-import re
-import os # Import os for path manipulation
+import os
+import base64
 
+# Import Brevo SDK
+import brevo_python as sib_api_v3_sdk
+from brevo_python.rest import ApiException
+from config import BREVO_API_KEY, FAILED_EMAILS_LOG_PATH # Import BREVO_API_KEY
 
-def _log_failed_email_to_file(sender_email, to_email, subject, body, error_message, log_path):
+def _log_failed_email_to_file(sender_email, to_email, subject, body, error_message, log_path=FAILED_EMAILS_LOG_PATH):
     """Logs details of a failed email attempt to a dedicated file."""
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log_entry = (
@@ -22,80 +21,63 @@ def _log_failed_email_to_file(sender_email, to_email, subject, body, error_messa
         f"Body Snippet (first 200 chars): {body[:200]}...\n"
         f"{'-'*50}\n\n"
     )
-    # Ensure the directory for the log file exists if it's a relative path
     log_dir = os.path.dirname(log_path)
     if log_dir and not os.path.exists(log_dir):
         os.makedirs(log_dir)
-        
+
     with open(log_path, "a", encoding="utf-8") as f:
         f.write(log_entry)
 
 
-def send_email_message(sender_email, sender_password, to_email, subject, body, attachments=None, log_path="failed_emails.log"):
+def send_email_message(sender_email, sender_name, to_email, to_name, subject, body, attachments=None):
     """
-    Sends an email message with optional attachments, handling common SMTP errors
-    and logging failures.
+    Sends an email using the Brevo (Sendinblue) API.
     """
-    if attachments is None:
-        attachments = []
+    configuration = sib_api_v3_sdk.Configuration()
+    configuration.api_key['api-key'] = BREVO_API_KEY
+
+    api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
+
+    to = [{"email": to_email, "name": to_name}]
+    sender = {"email": sender_email, "name": sender_name}
+
+    _attachments = []
+    if attachments: # 'attachments' is the function parameter, a list of file paths
+        for attachment_path in attachments:
+            try:
+                with open(attachment_path, "rb") as f:
+                    file_content = f.read()
+                    encoded_content = base64.b64encode(file_content).decode('utf-8')
+                    _attachments.append({
+                        "content": encoded_content,
+                        "name": os.path.basename(attachment_path)
+                    })
+            except Exception as e:
+                print(f"Warning: Could not read attachment {attachment_path}: {e}")
+                _log_failed_email_to_file(sender_email, to_email, subject, body, f"Attachment error for {os.path.basename(attachment_path)}: {e}", FAILED_EMAILS_LOG_PATH)
+                continue
+
+    # Conditionally add 'attachment' parameter to SendSmtpEmail constructor
+    send_smtp_email_args = {
+        "to": to,
+        "sender": sender,
+        "subject": subject,
+        "html_content": body,
+    }
+
+    if _attachments: # Only add if there are actual attachments
+        send_smtp_email_args["attachment"] = _attachments
+
+    send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(**send_smtp_email_args)
 
     try:
-        msg = MIMEMultipart()
-        msg['From'] = sender_email
-        msg['To'] = to_email
-        msg['Subject'] = subject
-
-        # Convert plain text body with newlines to HTML with <br> tags
-        # and attach it as HTML part
-        html_body = body.replace('\n', '<br>')
-        msg.attach(MIMEText(html_body, 'html'))
-
-        # Add attachments
-        for filepath in attachments:
-            if os.path.exists(filepath):
-                part = MIMEBase('application', 'octet-stream')
-                with open(filepath, 'rb') as file:
-                    part.set_payload(file.read())
-                encoders.encode_base64(part)
-                part.add_header('Content-Disposition',
-                                f'attachment; filename= {os.path.basename(filepath)}')
-                msg.attach(part)
-            else:
-                print(f"Warning: Attachment file not found - {filepath}")
-
-        # Determine SMTP server and port based on sender email domain
-        smtp_server = None
-        smtp_port = None
-        if "gmail.com" in sender_email:
-            smtp_server = "smtp.gmail.com"
-            smtp_port = 587
-        elif "outlook.com" in sender_email or "hotmail.com" in sender_email:
-            smtp_server = "smtp-mail.outlook.com"
-            smtp_port = 587
-        else:
-            error_msg = "Unsupported sender email domain. Only Gmail and Outlook/Hotmail are currently supported."
-            _log_failed_email_to_file(sender_email, to_email, subject, body, error_msg, log_path)
-            return {"status": "error", "message": "Unsupported sender email domain. Only Gmail and Outlook/Hotmail are currently supported."}
-
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.starttls()
-            server.login(sender_email, sender_password)
-            server.send_message(msg)
-        return {"status": "success", "message": "Email sent successfully."}
-
-    except smtplib.SMTPAuthenticationError as e:
-        error_msg = f"SMTP Authentication Error: {e}. Check email/password or app password settings."
-        _log_failed_email_to_file(sender_email, to_email, subject, body, error_msg, log_path)
-        return {"status": "error", "message": error_msg}
-    except smtplib.SMTPConnectError as e:
-        error_msg = f"SMTP Connection Error: {e}. Check server address or network."
-        _log_failed_email_to_file(sender_email, to_email, subject, body, error_msg, log_path)
-        return {"status": "error", "message": error_msg}
-    except smtplib.SMTPException as e:
-        error_msg = f"SMTP Error: {e}. A general SMTP error occurred."
-        _log_failed_email_to_file(sender_email, to_email, subject, body, error_msg, log_path)
+        api_response = api_instance.send_transac_email(send_smtp_email)
+        return {"status": "success", "message": "Email sent successfully via Brevo."}
+    except ApiException as e:
+        error_msg = f"Brevo API Error: {e.body}"
+        _log_failed_email_to_file(sender_email, to_email, subject, body, error_msg, FAILED_EMAILS_LOG_PATH)
         return {"status": "error", "message": error_msg}
     except Exception as e:
-        error_msg = f"An unexpected error occurred during email sending: {e}"
-        _log_failed_email_to_file(sender_email, to_email, subject, body, error_msg, log_path)
+        error_msg = f"An unexpected error occurred: {e}"
+        _log_failed_email_to_file(sender_email, to_email, subject, body, error_msg, FAILED_EMAILS_LOG_PATH)
         return {"status": "error", "message": error_msg}
