@@ -22,3 +22,45 @@ Nous avons le plaisir de vous inviter à notre Gala Annuel de Bienfaisance qui s
 Votre présence serait un ...
 --------------------------------------------------
 
+Timestamp: 2025-07-29 14:29:50
+Sender: asso.migdal@gmail.com
+Recipient: shirlybittan@gmail.com
+Subject: Opportunités de publicité passionnantes
+Error: Brevo API Key is not configured. Please set BREVO_API_KEY in config.py or environment variables.
+Body Snippet (first 200 chars): Cher Client,
+
+Nous avons le plaisir de vous informer des nouvelles opportunités de publicité que nous offrons à partir de ce mois-ci. Ces offres ont été spécialement conçues pour maximiser la visibili...
+--------------------------------------------------
+
+Timestamp: 2025-07-29 14:29:50
+Sender: asso.migdal@gmail.com
+Recipient: bittanshirly@gmail.com
+Subject: Opportunités de publicité passionnantes
+Error: Brevo API Key is not configured. Please set BREVO_API_KEY in config.py or environment variables.
+Body Snippet (first 200 chars): Cher Client,
+
+Nous avons le plaisir de vous informer des nouvelles opportunités de publicité que nous offrons à partir de ce mois-ci. Ces offres ont été spécialement conçues pour maximiser la visibili...
+--------------------------------------------------
+
+Timestamp: 2025-07-29 15:04:37
+Sender: asso.migdal@gmail.com
+Recipient: shirlybittan@gmail.com
+Subject: Opportunité de Collaboration Publicitaire avec Notre Marque
+Error: Brevo API Error: {"code":"missing_parameter","message":"attachment is missing"}
+
+Body Snippet (first 200 chars): Cher/Chère Alice Smith,
+
+Je vous écris pour explorer une possibilité de collaboration entre notre marque et votre entreprise pour des initiatives publicitaires. Chez {{Nom de l'entreprise}}, nous somm...
+--------------------------------------------------
+
+Timestamp: 2025-07-29 15:04:38
+Sender: asso.migdal@gmail.com
+Recipient: bittanshirly@gmail.com
+Subject: Opportunité de Collaboration Publicitaire avec Notre Marque
+Error: Brevo API Error: {"code":"missing_parameter","message":"attachment is missing"}
+
+Body Snippet (first 200 chars): Cher/Chère Bob Johnson,
+
+Je vous écris pour explorer une possibilité de collaboration entre notre marque et votre entreprise pour des initiatives publicitaires. Chez {{Nom de l'entreprise}}, nous somm...
+--------------------------------------------------
+

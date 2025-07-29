@@ -6,3 +6,4 @@ langchain
 langchain-openai
 openpyxl
 streamlit
+brevo-python
