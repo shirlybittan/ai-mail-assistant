@@ -57,12 +57,15 @@ def send_email_message(sender_email, sender_name, to_email, to_name, subject, bo
                 _log_failed_email_to_file(sender_email, to_email, subject, body, f"Attachment error for {os.path.basename(attachment_path)}: {e}", FAILED_EMAILS_LOG_PATH)
                 continue
 
+    # Convert newlines to HTML break tags for proper formatting in email
+    html_body = body.replace('\n', '<br>')
+
     # Conditionally add 'attachment' parameter to SendSmtpEmail constructor
     send_smtp_email_args = {
         "to": to,
         "sender": sender,
         "subject": subject,
-        "html_content": body,
+        "html_content": html_body, # Use the HTML-formatted body
     }
 
     if _attachments: # Only add if there are actual attachments
