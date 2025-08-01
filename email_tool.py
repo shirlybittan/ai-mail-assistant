@@ -1,86 +1,153 @@
-# email_tool.py
-
 import datetime
 import os
 import base64
+import json
 
 # Import Brevo SDK
 import brevo_python as sib_api_v3_sdk
 from brevo_python.rest import ApiException
-from config import BREVO_API_KEY, FAILED_EMAILS_LOG_PATH # Import BREVO_API_KEY
+from config import BREVO_API_KEY, FAILED_EMAILS_LOG_PATH  # Import your BREVO_API_KEY and log path constants
+
 
 def _log_failed_email_to_file(sender_email, to_email, subject, body, error_message, log_path=FAILED_EMAILS_LOG_PATH):
-    """Logs details of a failed email attempt to a dedicated file."""
+    """Logs details of a failed email attempt to a file."""
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    log_entry = (
+    entry = (
         f"Timestamp: {timestamp}\n"
         f"Sender: {sender_email}\n"
         f"Recipient: {to_email}\n"
         f"Subject: {subject}\n"
         f"Error: {error_message}\n"
-        f"Body Snippet (first 200 chars): {body[:200]}...\n"
+        f"Body Snippet: {body[:200]}...\n"
         f"{'-'*50}\n\n"
     )
-    log_dir = os.path.dirname(log_path)
-    if log_dir and not os.path.exists(log_dir):
-        os.makedirs(log_dir)
-
+    os.makedirs(os.path.dirname(log_path), exist_ok=True)
     with open(log_path, "a", encoding="utf-8") as f:
-        f.write(log_entry)
+        f.write(entry)
+
+
+
+
+
+def _build_message_versions(messages):
+    """
+    Build and return a list of SendSmtpEmailMessageVersions instances
+    for bulk batch sends.
+
+    :param messages: List of dicts with keys 'to_email', 'to_name', 'subject', 'body'
+    :return: List of sib_api_v3_sdk.SendSmtpEmailMessageVersions
+    """
+    versions = []
+
+    for i, msg in enumerate(messages):
+        to_email = msg['to_email']
+        to_name = msg.get('to_name', '')
+        subject = msg.get('subject', '')
+        body = msg.get('body', '')
+        html_body = body.replace('\n', '<br>')
+
+        # Create nested SDK model objects
+        to_obj = sib_api_v3_sdk.SendSmtpEmailTo(email=to_email, name=to_name)
+        version_obj = sib_api_v3_sdk.SendSmtpEmailMessageVersions(
+            to=[to_obj],
+            subject=subject,
+            html_content=html_body
+        )
+        versions.append(version_obj)
+
+    return versions
 
 
 def send_email_message(sender_email, sender_name, to_email, to_name, subject, body, attachments=None):
-    """
-    Sends an email using the Brevo (Sendinblue) API.
-    """
+    """Send a single transactional email."""
     configuration = sib_api_v3_sdk.Configuration()
     configuration.api_key['api-key'] = BREVO_API_KEY
+    api = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
 
-    api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
-
-    to = [{"email": to_email, "name": to_name}]
-    sender = {"email": sender_email, "name": sender_name}
-
-    _attachments = []
-    if attachments: # 'attachments' is the function parameter, a list of file paths
-        for attachment_path in attachments:
+    # Process attachments
+    attachment_list = []
+    if attachments:
+        for path in attachments:
             try:
-                with open(attachment_path, "rb") as f:
-                    file_content = f.read()
-                    encoded_content = base64.b64encode(file_content).decode('utf-8')
-                    _attachments.append({
-                        "content": encoded_content,
-                        "name": os.path.basename(attachment_path)
-                    })
+                with open(path, 'rb') as f:
+                    data = f.read()
+                encoded = base64.b64encode(data).decode('utf-8')
+                attachment_list.append({
+                    'content': encoded,
+                    'name': os.path.basename(path)
+                })
             except Exception as e:
-                print(f"Warning: Could not read attachment {attachment_path}: {e}")
-                _log_failed_email_to_file(sender_email, to_email, subject, body, f"Attachment error for {os.path.basename(attachment_path)}: {e}", FAILED_EMAILS_LOG_PATH)
-                continue
+                _log_failed_email_to_file(sender_email, to_email, subject, body, str(e))
 
-    # Convert newlines to HTML break tags for proper formatting in email
     html_body = body.replace('\n', '<br>')
-
-    # Conditionally add 'attachment' parameter to SendSmtpEmail constructor
-    send_smtp_email_args = {
-        "to": to,
-        "sender": sender,
-        "subject": subject,
-        "html_content": html_body, # Use the HTML-formatted body
+    email_args = {
+        'sender': {'email': sender_email, 'name': sender_name},
+        'to': [ {'email': to_email, 'name': to_name} ],
+        'subject': subject,
+        'html_content': html_body,
     }
+    if attachment_list:
+        email_args['attachment'] = attachment_list
 
-    if _attachments: # Only add if there are actual attachments
-        send_smtp_email_args["attachment"] = _attachments
-
-    send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(**send_smtp_email_args)
+    email_model = sib_api_v3_sdk.SendSmtpEmail(**email_args)
 
     try:
-        api_response = api_instance.send_transac_email(send_smtp_email)
-        return {"status": "success", "message": "Email sent successfully via Brevo."}
+        response = api.send_transac_email(email_model)
+        return {'status': 'success', 'response': response}
     except ApiException as e:
-        error_msg = f"Brevo API Error: {e.body}"
-        _log_failed_email_to_file(sender_email, to_email, subject, body, error_msg, FAILED_EMAILS_LOG_PATH)
-        return {"status": "error", "message": error_msg}
-    except Exception as e:
-        error_msg = f"An unexpected error occurred: {e}"
-        _log_failed_email_to_file(sender_email, to_email, subject, body, error_msg, FAILED_EMAILS_LOG_PATH)
-        return {"status": "error", "message": error_msg}
+        err = e.body if hasattr(e, 'body') else str(e)
+        _log_failed_email_to_file(sender_email, to_email, subject, body, err)
+        return {'status': 'error', 'message': err}
+
+
+def send_bulk_email_messages(sender_email, sender_name, messages, attachments=None):
+    """Send multiple transactional emails in one batch call."""
+    if not messages:
+        return {'status': 'error', 'message': 'No messages provided'}
+
+    if len(messages) > 2000:
+        return {'status': 'error', 'message': 'Brevo limit is 2000 recipients per batch'}
+
+    configuration = sib_api_v3_sdk.Configuration()
+    configuration.api_key['api-key'] = BREVO_API_KEY
+    api = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
+
+    # Process attachments once
+    attachment_list = []
+    if attachments:
+        for path in attachments:
+            try:
+                with open(path, 'rb') as f:
+                    data = f.read()
+                encoded = base64.b64encode(data).decode('utf-8')
+                attachment_list.append({'content': encoded, 'name': os.path.basename(path)})
+            except Exception as e:
+                pass
+
+    # Build versions with proper SDK models
+    versions = _build_message_versions(messages)
+
+    # Use first message as global default
+    first = messages[0]
+    global_html = first.get('body', '').replace('\n', '<br>')
+    global_subject = first.get('subject', '')
+
+    batch_args = {
+        'sender': {'email': sender_email, 'name': sender_name},
+        'subject': global_subject,
+        'html_content': global_html,
+        'message_versions': versions
+    }
+    if attachment_list:
+        batch_args['attachment'] = attachment_list
+
+    batch_model = sib_api_v3_sdk.SendSmtpEmail(**batch_args)
+
+    try:
+        response = api.send_transac_email(batch_model)
+        return {'status': 'success', 'response': response}
+    except ApiException as e:
+        err = e.body if hasattr(e, 'body') else str(e)
+        for msg in messages:
+            _log_failed_email_to_file(sender_email, msg['to_email'], msg.get('subject', ''), msg.get('body', ''), err)
+        return {'status': 'error', 'message': err}
