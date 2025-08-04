@@ -82,6 +82,7 @@ def init_state():
         st.session_state.attachments = [] # Stores UploadedFile objects
         st.session_state.email_sending_status = []
         st.session_state.sending_summary = {'total_contacts':0, 'successful':0, 'failed':0}
+        st.session_state.detailed_response = None
         st.session_state.generation_in_progress = False
         st.session_state.sending_in_progress = False
         st.session_state.user_prompt = ''
@@ -303,20 +304,37 @@ def send_all_emails():
     result_message = result.get("message", "")
     
     if result_status == "success":
-        success = len(messages)
-        fail = 0
-        status.append(f"Bulk send succeeded: {success} emails sent successfully.")
+        message_ids = result.get("message_ids", [])
+        total_sent = result.get("total_sent", len(messages))
+        success = total_sent
+        fail = total_contacts - success
+        
+        # Add detailed status information
+        status.append(f"✅ Bulk send completed successfully!")
+        status.append(f"📧 Total emails sent: {success}")
+        status.append(f"📊 Success rate: {success}/{total_contacts} ({(success/total_contacts*100):.1f}%)")
+        
+        # Add individual message IDs if available
+        if message_ids:
+            status.append(f"📋 Message IDs received: {len(message_ids)}")
+            for i, msg_id in enumerate(message_ids, 1):
+                recipient_email = messages[i-1]['to_email'] if i <= len(messages) else f"Recipient {i}"
+                status.append(f"   {i}. {recipient_email}: {msg_id}")
+        
+        if fail > 0:
+            status.append(f"⚠️ {fail} emails failed to send")
+            
     elif result_status == "partial_success":
         # Extract success count from message
         import re
         success_match = re.search(r'(\d+) emails sent successfully', result_message)
         success = int(success_match.group(1)) if success_match else 0
         fail = total_contacts - success
-        status.append(f"Partial success: {result_message}")
+        status.append(f"⚠️ Partial success: {result_message}")
     else:
         success = 0
         fail = total_contacts
-        status.append(f"Bulk send failed: {result_message}")
+        status.append(f"❌ Bulk send failed: {result_message}")
 
     st.session_state.email_sending_status = status
     st.session_state.sending_summary = {
@@ -324,6 +342,8 @@ def send_all_emails():
         'successful': success,
         'failed': fail
     }
+    # Store detailed response data for the results page
+    st.session_state.detailed_response = result
     st.session_state.page = 'results'
     st.session_state.sending_in_progress = False
     st.rerun()
@@ -598,10 +618,16 @@ def page_results():
         log_display_container = st.container() 
         if st.session_state.email_sending_status:
             for log_entry in st.session_state.email_sending_status:
-                if "error" in log_entry.lower() or "failed" in log_entry.lower():
+                # Check for different types of log entries and format accordingly
+                if "❌" in log_entry or "error" in log_entry.lower() or "failed" in log_entry.lower():
                     log_display_container.error(log_entry)
-                elif "success" in log_entry.lower():
+                elif "✅" in log_entry or "success" in log_entry.lower():
                     log_display_container.success(log_entry)
+                elif "📋" in log_entry or log_entry.strip().startswith("   "):  # Message ID entries
+                    # Use a special container for message IDs with monospace font
+                    log_display_container.markdown(f"```{log_entry}```")
+                elif "⚠️" in log_entry:
+                    log_display_container.warning(log_entry)
                 else:
                     log_display_container.info(log_entry)
 
@@ -610,7 +636,7 @@ def page_results():
         # Clear all relevant session state variables
         keys_to_clear = [
             'initialized', 'language', 'page', 'contacts', 'contact_issues', 
-            'attachments', 'email_sending_status', 'sending_summary', 
+            'attachments', 'email_sending_status', 'sending_summary', 'detailed_response',
             'generation_in_progress', 'sending_in_progress', 'user_prompt', 
             'user_email_context', 'personalize_emails', 'generic_greeting', 
             'template_subject', 'template_body', 'editable_subject', 'editable_body',

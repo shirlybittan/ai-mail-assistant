@@ -145,7 +145,19 @@ def send_bulk_email_messages(sender_email, sender_name, messages, attachments=No
 
     try:
         response = api.send_transac_email(batch_model)
-        return {'status': 'success', 'response': response}
+        # Extract message IDs from the response
+        message_ids = []
+        if hasattr(response, 'message_ids') and response.message_ids:
+            message_ids = response.message_ids
+        elif hasattr(response, 'message_id') and response.message_id:
+            message_ids = [response.message_id]
+        
+        return {
+            'status': 'success', 
+            'response': response,
+            'message_ids': message_ids,
+            'total_sent': len(message_ids)
+        }
     except ApiException as e:
         err = e.body if hasattr(e, 'body') else str(e)
         for msg in messages:
