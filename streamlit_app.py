@@ -30,6 +30,42 @@ body {
 div.stActionButton, div.stDownloadButton, div.stFileUploadDropzone {
     margin-bottom: 0.5rem; /* Adjust as needed */
 }
+
+/* Custom button styling for language selection */
+.stButton>button {
+    width: 100%; /* Make buttons take full column width */
+    height: 3em; /* Make buttons a bit taller */
+    font-size: 1.1em;
+    font-weight: bold;
+    border-radius: 8px;
+    transition: all 0.2s ease-in-out;
+    /* Default for secondary buttons (unselected) */
+    border: 1px solid #ccc;
+    background-color: white;
+    color: #333;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.stButton>button:hover {
+    border-color: #2563eb; /* Blue border on hover */
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+/* Styling for the SELECTED language button (primary type) */
+.stButton button[kind="primary"] {
+    background-color: #2563eb; /* Strong blue background */
+    color: white; /* White text */
+    border-color: #2563eb; /* Blue border */
+    font-weight: bold; /* Make it bolder */
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2); /* More prominent shadow */
+}
+
+/* Hover effect for the primary (selected) button too */
+.stButton button[kind="primary"]:hover {
+    background-color: #1a4fbd; /* Slightly darker blue on hover */
+    border-color: #1a4fbd;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -62,22 +98,48 @@ def init_state():
         st.session_state.initialized = True
 init_state()
 
-# --- Language Selection (moved up for immediate effect) ---
-with st.sidebar:
-    chosen_lang = st.selectbox(
-        _t("Language"), # Now translated
-        options=list(LANGUAGES.keys()),
-        format_func=lambda x: LANGUAGES[x], # Display full language name
-        index=list(LANGUAGES.keys()).index(st.session_state.language),
-        key="language_selector"
-    )
-    if chosen_lang != st.session_state.language:
-        st.session_state.language = chosen_lang
-        set_language(chosen_lang)
-        st.rerun()
-
-# Apply the selected language immediately after initialization and selection
+# --- Language Selection (moved to main content area) ---
+# Apply the selected language immediately after initialization
 set_language(st.session_state.language)
+
+# Dictionary to map language codes to display strings with flags
+LANGUAGE_BUTTON_LABELS = {
+    "en": "🇬🇧 EN", # English flag + EN
+    "fr": "🇫🇷 FR", # French flag + FR
+}
+
+# Use st.columns to place the language selector on the right of a potential title
+col_title, col_lang = st.columns([8, 2])
+
+with col_lang:
+    # Use columns for language selection buttons
+    lang_col1, lang_col2 = st.columns(2)
+    
+    with lang_col1:
+        if st.button(
+            LANGUAGE_BUTTON_LABELS["en"],
+            key="lang_button_en",
+            # Logic: primary (blue) if selected, secondary (white) if not
+            type="primary" if st.session_state.language == "en" else "secondary", 
+            use_container_width=True
+        ):
+            st.session_state.language = "en"
+            set_language("en")
+            st.rerun()
+    with lang_col2:
+        if st.button(
+            LANGUAGE_BUTTON_LABELS["fr"],
+            key="lang_button_fr",
+            # Logic: primary (blue) if selected, secondary (white) if not
+            type="primary" if st.session_state.language == "fr" else "secondary", 
+            use_container_width=True
+        ):
+            st.session_state.language = "fr"
+            set_language("fr")
+            st.rerun()
+
+with col_title:
+    st.title(_t("AI Email Assistant")) # Main application title
 
 # --- UI Helpers ---
 def render_step_indicator(current_step: int):
@@ -232,7 +294,9 @@ def send_all_emails():
             sender_email=SENDER_EMAIL,
             sender_name=SENDER_EMAIL.split('@')[0].replace('.', ' ').title(),
             messages=messages,
-            attachments=temp_attachment_paths if temp_attachment_paths else None
+            attachments=temp_attachment_paths if temp_attachment_paths else None,
+            use_sandbox_mode=True # <--- Add this parameter for testing!
+
         )
 
     # Build status & summary
