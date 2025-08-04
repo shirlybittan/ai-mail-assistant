@@ -4,7 +4,7 @@ import streamlit as st
 import pandas as pd
 from data_handler import load_contacts_from_excel
 from email_agent import SmartEmailAgent
-from email_tool import send_email_message
+from email_tool import send_bulk_email_messages
 from config import SENDER_EMAIL, OPENAI_API_KEY, FAILED_EMAILS_LOG_PATH, BREVO_API_KEY
 from translations import LANGUAGES, _t, set_language
 import datetime
@@ -179,99 +179,92 @@ def generate_email_preview_and_template():
 
 def send_all_emails():
     st.session_state.sending_in_progress = True
-    status = []
-    success = fail = 0
     total_contacts = len(st.session_state.contacts)
 
-    # Initialize a progress bar
-    progress_text = _t("Sending emails. Please wait.")
-    my_bar = st.progress(0, text=progress_text)
-
-    temp_attachment_paths = [] # To store paths of temporary attachment files
-
-    # Create a temporary directory for attachments
+    # Prepare attachments in a temp dir
+    temp_attachment_paths = []
     with tempfile.TemporaryDirectory() as temp_dir:
-        try:
-            # Save uploaded attachments to temporary files
-            for uploaded_file in st.session_state.attachments:
-                temp_file_path = os.path.join(temp_dir, uploaded_file.name)
-                with open(temp_file_path, "wb") as f:
-                    f.write(uploaded_file.getbuffer())
-                temp_attachment_paths.append(temp_file_path)
+        for uploaded_file in st.session_state.attachments:
+            path = os.path.join(temp_dir, uploaded_file.name)
+            with open(path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+            temp_attachment_paths.append(path)
 
-            for i, contact in enumerate(st.session_state.contacts):
-                # Update progress bar
-                progress_percentage = (i + 1) / total_contacts
-                my_bar.progress(progress_percentage, text=f"{progress_text} ({i+1}/{total_contacts})")
+        # Build the list of message dicts
+        messages = []
+        for contact in st.session_state.contacts:
+            email = contact.get('email')
+            name  = contact.get('name', '')
 
-                if not contact.get('email'):
-                    msg = f"Skipped: Contact without email - {contact.get('name', 'N/A')}"
-                    status.append(msg)
-                    fail += 1
-                    continue
+            if not email:
+                continue  # skip missing emails
 
-                email = contact['email']
-                
-                subj = st.session_state.editable_subject
-                body = st.session_state.editable_body # Body already contains generic greeting if generic
+            # Start from the editable template
+            subj = st.session_state.editable_subject
+            body = st.session_state.editable_body
 
-                # Apply personalization to subject and body if needed
-                if st.session_state.personalize_emails:
-                    actual_greeting = contact.get('name', '')
-                    contact_email = contact.get('email', '')
+            # Personalize if needed
+            if st.session_state.personalize_emails:
+                for ph in ["{{Name}}", "{{Nom}}"]:
+                    subj = subj.replace(ph, name)
+                    body = body.replace(ph, name)
+                for ph in ["{{Email}}", "{{Courriel}}"]:
+                    subj = subj.replace(ph, email)
+                    body = body.replace(ph, email)
+            else:
+                # strip any leftover placeholders
+                for ph in ["{{Name}}","{{Nom}}","{{Email}}","{{Courriel}}"]:
+                    subj = subj.replace(ph, "")
+                    body = body.replace(ph, "")
 
-                    # Replace placeholders for Name/Nom
-                    for placeholder in ["{{Name}}", "{{Nom}}"]:
-                        subj = subj.replace(placeholder, actual_greeting)
-                        body = body.replace(placeholder, actual_greeting)
+            # ensure HTML formatting
+            body_html = body.replace("\n", "<br>\n")
 
-                    # Replace placeholders for Email/Courriel
-                    for placeholder in ["{{Email}}", "{{Courriel}}"]:
-                        subj = subj.replace(placeholder, contact_email)
-                        body = body.replace(placeholder, contact_email)
-                else:
-                    # For generic emails, ensure subject does not contain {{Name}} or {{Email}}
-                    # These should already be handled if the AI agent inserts them, but this is a safeguard.
-                    subj = subj.replace("{{Name}}", "").replace("{{Email}}", "").replace("{{Nom}}", "").replace("{{Courriel}}", "")
-                    body = body.replace("{{Name}}", "").replace("{{Email}}", "").replace("{{Nom}}", "").replace("{{Courriel}}", "")
+            messages.append({
+                "to_email": email,
+                "to_name": name,
+                "subject": subj,
+                "body": body_html
+            })
 
+        # Send all at once
+        result = send_bulk_email_messages(
+            sender_email=SENDER_EMAIL,
+            sender_name=SENDER_EMAIL.split('@')[0].replace('.', ' ').title(),
+            messages=messages,
+            attachments=temp_attachment_paths if temp_attachment_paths else None
+        )
 
-                sender_info = SENDER_EMAIL
+    # Build status & summary
+    status = []
+    result_status = result.get("status")
+    result_message = result.get("message", "")
+    
+    if result_status == "success":
+        success = len(messages)
+        fail = 0
+        status.append(f"Bulk send succeeded: {success} emails sent successfully.")
+    elif result_status == "partial_success":
+        # Extract success count from message
+        import re
+        success_match = re.search(r'(\d+) emails sent successfully', result_message)
+        success = int(success_match.group(1)) if success_match else 0
+        fail = total_contacts - success
+        status.append(f"Partial success: {result_message}")
+    else:
+        success = 0
+        fail = total_contacts
+        status.append(f"Bulk send failed: {result_message}")
 
-                # Attempt to send email
-                try:
-                    result = send_email_message(
-                        sender_email=SENDER_EMAIL,
-                        sender_name=SENDER_EMAIL.split('@')[0].replace('.', ' ').title(),
-                        to_email=email,
-                        to_name=contact.get('name', ''),
-                        subject=subj,
-                        body=body,
-                        attachments=temp_attachment_paths
-                    )
-                    if result.get('status') == 'success':
-                        msg = f"Success: {contact.get('name', email)} <{email}>" # Use contact name or email for log
-                        success += 1
-                    else:
-                        msg = f"Error: {contact.get('name', email)} <{email}> - {result.get('message')}"
-                        fail += 1
-                    status.append(msg)
-                except Exception as e:
-                    msg = f"Error: {contact.get('name', email)} <{email}> - {str(e)}"
-                    status.append(msg)
-                    fail += 1
-        finally:
-            my_bar.empty() # Clear the progress bar after completion
-
-            st.session_state.email_sending_status = status
-            st.session_state.sending_summary = {
-                'total_contacts': total_contacts,
-                'successful': success,
-                'failed': fail
-            }
-            st.session_state.page = 'results'
-            st.session_state.sending_in_progress = False
-            st.rerun()
+    st.session_state.email_sending_status = status
+    st.session_state.sending_summary = {
+        'total_contacts': total_contacts,
+        'successful': success,
+        'failed': fail
+    }
+    st.session_state.page = 'results'
+    st.session_state.sending_in_progress = False
+    st.rerun()
 
 # --- Page: Generate ---
 def page_generate():
