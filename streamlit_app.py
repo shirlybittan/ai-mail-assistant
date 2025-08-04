@@ -294,9 +294,7 @@ def send_all_emails():
             sender_email=SENDER_EMAIL,
             sender_name=SENDER_EMAIL.split('@')[0].replace('.', ' ').title(),
             messages=messages,
-            attachments=temp_attachment_paths if temp_attachment_paths else None,
-            use_sandbox_mode=True # <--- Add this parameter for testing!
-
+            attachments=temp_attachment_paths if temp_attachment_paths else None
         )
 
     # Build status & summary
@@ -463,17 +461,28 @@ def page_preview():
     render_step_indicator(2)
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # --- Main Content Columns ---
+    # --- Section Titles (above the boxes) ---
+    title_cols = st.columns(2)
+    with title_cols[0]:
+        st.markdown(f"<h4>{_t('Editable Email Content')}</h4>", unsafe_allow_html=True)
+        st.markdown(
+            f"<div class='info-text-blue'>{_t('Edit the email template here. Changes will reflect in the live preview.')}</div>",
+            unsafe_allow_html=True
+        )
+    with title_cols[1]:
+        st.markdown(f"<h4>{_t('Live Preview for First Contact')}</h4>", unsafe_allow_html=True)
+        st.markdown(
+            f"<div class='info-text-normal'>{_t('This shows how the email will appear for the first contact. To make changes, use the *Editable Email Content* section on the left.')}</div>",
+            unsafe_allow_html=True
+        )
+
+    # --- Main Content Columns (the actual boxes) ---
     col1, col2 = st.columns(2)
 
     with col1:
         with st.container(border=True):
-            st.markdown(f"<h4>{_t('Editable Email Content')}</h4>", unsafe_allow_html=True)
-            st.markdown(f"<div class='info-text-blue'>{_t('Edit the email template here. Changes will reflect in the live preview.')}</div>", unsafe_allow_html=True)
-            
-            # Vertical spacer to align the 'Subject' fields across columns.
-            # Height is estimated to match the 'Recipient' field on the right.
-            st.markdown('<div style="height: 78px;"></div>', unsafe_allow_html=True)
+            st.text_input(_t("Recipient"), value="{{Person Name}} <{{Person Email}}>", disabled=True)
+
             
             st.session_state.editable_subject = st.text_input(
                 _t("Subject"),
@@ -489,8 +498,6 @@ def page_preview():
 
     with col2:
         with st.container(border=True):
-            st.markdown(f"<h4>{_t('Live Preview for First Contact')}</h4>", unsafe_allow_html=True)
-            st.markdown(f"<div class='info-text-normal'>{_t('This shows how the email will appear for the first contact. To make changes, use the *Editable Email Content* section on the left.')}</div>", unsafe_allow_html=True)
             
             if st.session_state.contacts:
                 first_contact = st.session_state.contacts[0]
