@@ -72,7 +72,7 @@ TRANSLATIONS = {
         "Language": "Language", # For the sidebar selectbox label
         "Dear": "Dear", # Added for dynamic salutation prefix
         "Edit the email template here. Changes will reflect in the live preview.": "Edit the email template here. Changes will reflect in the live preview.", # New info text for editable section
-        "This shows how the email will appear for the first contact. To make changes, use the 'Editable Email Content' section on the left.": "This shows how the email will appear for the first contact. To make changes, use the 'Editable Email Content' section on the left." # New info text for preview section
+        "This shows how the email will appear for the first contact. To make changes, use the *Editable Email Content* section on the left.": "This shows how the email will appear for the first contact. To make changes, use the 'Editable Email Content' section on the left." # New info text for preview section
     },
     "fr": {
         "AI Email Assistant": "Assistant d'E-mail IA",
@@ -138,7 +138,7 @@ TRANSLATIONS = {
         "Language": "Langue",
         "Dear": "Bonjour", # Added for dynamic salutation prefix (translated to Bonjour for French)
         "Edit the email template here. Changes will reflect in the live preview.": "Modifiez le modèle d'e-mail ici. Les modifications se refléteront dans l'aperçu en direct.",
-        "This shows how the email will appear for the first contact. To make changes, use the 'Editable Email Content' section on the left.": "Ceci montre l'apparence de l'e-mail pour le premier contact. Pour apporter des modifications, utilisez la section 'Contenu de l'e-mail modifiable' sur la gauche."
+        "This shows how the email will appear for the first contact. To make changes, use the *Editable Email Content* section on the left.": "Ceci montre l'apparence de l'e-mail pour le premier contact. Pour apporter des modifications, utilisez la section 'Contenu de l'e-mail modifiable' sur la gauche."
     }
 }
 
