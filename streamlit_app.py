@@ -310,9 +310,9 @@ def send_all_emails():
         fail = total_contacts - success
         
         # Add detailed status information
-        status.append(f"✅ Bulk send completed successfully!")
-        status.append(f"📧 Total emails sent: {success}")
-        status.append(f"📊 Success rate: {success}/{total_contacts} ({(success/total_contacts*100):.1f}%)")
+        status.append(_t("✅ Bulk send completed successfully!"))
+        status.append(_t("📧 Total emails sent: ") + str(success))
+        status.append(_t("📊 Success rate: ") + f"{success}/{total_contacts} ({(success/total_contacts*100):.1f}%)")
         
         # Add individual message IDs if available
         if message_ids:
@@ -350,7 +350,7 @@ def send_all_emails():
 
 # --- Page: Generate ---
 def page_generate():
-    st.subheader(_t("1. Email Generation"))
+    st.subheader(_t("1. Generation"))
     render_step_indicator(1)
 
     # --- Sender Information (Always visible at the top) ---
@@ -475,7 +475,7 @@ def page_preview():
             st.session_state.page = 'generate'
             st.rerun()
     with header_cols[1]:
-        st.markdown(f"<h2 style='text-align: center;'>{_t('2. Preview & Attachments')}</h2>", unsafe_allow_html=True)
+        st.markdown(f"<h2 style='text-align: center;'>{_t('2. Preview')}</h2>", unsafe_allow_html=True)
     
     # --- Progress Indicator ---
     render_step_indicator(2)
@@ -501,7 +501,7 @@ def page_preview():
 
     with col1:
         with st.container(border=True):
-            st.text_input(_t("Recipient"), value="{{Person Name}} <{{Person Email}}>", disabled=True)
+            st.text_input(_t("Recipient"), value="{{Email}}>", disabled=True)
 
             
             st.session_state.editable_subject = st.text_input(
@@ -584,7 +584,7 @@ def page_preview():
 
 # --- Page: Results ---
 def page_results():
-    st.subheader(_t("3. Sending Results"))
+    st.subheader(_t("3. Results"))
     render_step_indicator(3)
 
     summary = st.session_state.sending_summary
