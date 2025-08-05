@@ -69,6 +69,26 @@ div.stActionButton, div.stDownloadButton, div.stFileUploadDropzone {
 </style>
 """, unsafe_allow_html=True)
 
+# --- Language Selection (moved to main content area) ---
+st.markdown("""
+<style>
+/* — ENGLISH button: use UK flag as background image — */
+div.st-key-lang_button_en button {
+    padding-left: 28px !important;              /* make room for the icon */
+    background-image: url('https://flagcdn.com/16x12/gb.png') !important;
+    background-repeat: no-repeat !important;
+    background-position: 6px center !important;
+}
+/* — FRENCH button: use French flag — */
+div.st-key-lang_button_fr button {
+    padding-left: 28px !important;
+    background-image: url('https://flagcdn.com/16x12/fr.png') !important;
+    background-repeat: no-repeat !important;
+    background-position: 6px center !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # --- Page Config ---
 st.set_page_config(layout="wide", page_title=_t("AI Email Assistant"))
 
@@ -103,10 +123,10 @@ init_state()
 # Apply the selected language immediately after initialization
 set_language(st.session_state.language)
 
-# Dictionary to map language codes to display strings with flags
+# Dictionary to map language codes to display strings
 LANGUAGE_BUTTON_LABELS = {
-    "en": "🇬🇧 EN", # English flag + EN
-    "fr": "🇫🇷 FR", # French flag + FR
+    "en": "EN",
+    "fr": "FR",
 }
 
 # Use st.columns to place the language selector on the right of a potential title
