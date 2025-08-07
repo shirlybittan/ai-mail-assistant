@@ -135,13 +135,13 @@ col_title, col_lang = st.columns([8, 2])
 with col_lang:
     # Use columns for language selection buttons
     lang_col1, lang_col2 = st.columns(2)
-    
+
     with lang_col1:
         if st.button(
             LANGUAGE_BUTTON_LABELS["en"],
             key="lang_button_en",
             # Logic: primary (blue) if selected, secondary (white) if not
-            type="primary" if st.session_state.language == "en" else "secondary", 
+            type="primary" if st.session_state.language == "en" else "secondary",
             use_container_width=True
         ):
             st.session_state.language = "en"
@@ -152,7 +152,7 @@ with col_lang:
             LANGUAGE_BUTTON_LABELS["fr"],
             key="lang_button_fr",
             # Logic: primary (blue) if selected, secondary (white) if not
-            type="primary" if st.session_state.language == "fr" else "secondary", 
+            type="primary" if st.session_state.language == "fr" else "secondary",
             use_container_width=True
         ):
             st.session_state.language = "fr"
@@ -208,7 +208,7 @@ def _add_greeting_to_body(body_content, greeting_text, current_language):
         'en': ['dear', 'hello', 'hi'],
         'fr': ['cher', 'chère', 'chers', 'chères', 'bonjour', 'salut']
     }
-    
+
     greeting_already_has_salutation = False
     for salutation_word in salutations_to_check.get(current_language, []):
         if greeting_text.lower().startswith(salutation_word):
@@ -219,7 +219,7 @@ def _add_greeting_to_body(body_content, greeting_text, current_language):
         body_prefix = f"{salutation_prefix} {greeting_text},\n\n"
     else:
         body_prefix = f"{greeting_text},\n\n" # Use the greeting as is if it already contains a salutation
-    
+
     return body_prefix + body_content
 
 # --- Business Logic ---
@@ -232,14 +232,14 @@ def generate_email_preview_and_template():
         return
 
     agent = SmartEmailAgent(openai_api_key=OPENAI_API_KEY)
-    
+
     template = agent.generate_email_template(
         prompt=st.session_state.user_prompt,
         user_email_context=st.session_state.user_email_context,
         output_language=st.session_state.language,
         personalize_emails=st.session_state.personalize_emails
     )
-    
+
     st.session_state.template_subject = template['subject']
     st.session_state.template_body = template['body']
     st.session_state.editable_subject = template['subject']
@@ -254,7 +254,7 @@ def generate_email_preview_and_template():
             st.session_state.language
         )
         st.session_state.template_body = st.session_state.editable_body # Keep template_body updated too
-        
+
     st.session_state.generation_in_progress = False
     st.session_state.email_generated = True # Set flag to show generated email fields
     st.session_state.page = 'preview' # Set page to preview after generation
@@ -322,28 +322,28 @@ def send_all_emails():
     status = []
     result_status = result.get("status")
     result_message = result.get("message", "")
-    
+
     if result_status == "success":
         message_ids = result.get("message_ids", [])
         total_sent = result.get("total_sent", len(messages))
         success = total_sent
         fail = total_contacts - success
-        
+
         # Add detailed status information
         status.append(_t("✅ Bulk send completed successfully!"))
         status.append(_t("📧 Total emails sent: ") + str(success))
         status.append(_t("📊 Success rate: ") + f"{success}/{total_contacts} ({(success/total_contacts*100):.1f}%)")
-        
+
         # Add individual message IDs if available
         if message_ids:
             status.append(f"📋 Message IDs received: {len(message_ids)}")
             for i, msg_id in enumerate(message_ids, 1):
                 recipient_email = messages[i-1]['to_email'] if i <= len(messages) else f"Recipient {i}"
                 status.append(f"   {i}. {recipient_email}: {msg_id}")
-        
+
         if fail > 0:
             status.append(f"⚠️ {fail} emails failed to send")
-            
+
     elif result_status == "partial_success":
         # Extract success count from message
         import re
@@ -390,22 +390,22 @@ def page_generate():
     if uploaded_file is not None and \
        (st.session_state.uploaded_file_name is None or \
         st.session_state.uploaded_file_name != uploaded_file.name):
-        
+
         with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_file:
             shutil.copyfileobj(uploaded_file, tmp_file)
             st.session_state.uploaded_file_path = tmp_file.name # Store path for access
-        
+
         st.session_state.uploaded_file_name = uploaded_file.name
         contacts, issues = load_contacts_from_excel(st.session_state.uploaded_file_path)
         st.session_state.contacts = contacts
         st.session_state.contact_issues = issues
         st.session_state.show_generation_section = True # Show the AI generation form
-        
+
         if issues:
             st.warning(_t("WARNING: Some contacts had issues (e.g., missing/invalid/duplicate emails). They will be skipped."))
             for issue in issues:
                 st.info(f"  - {issue}")
-        
+
         if contacts:
             st.success(_t("Successfully loaded {count} valid contacts.", count=len(contacts)))
         else:
@@ -441,7 +441,7 @@ def page_generate():
             value=st.session_state.personalize_emails,
             key="personalize_emails_checkbox"
         )
-        
+
         if not st.session_state.personalize_emails:
             st.session_state.generic_greeting = st.text_input(
                 _t("Generic Greeting (e.g., 'Dear Valued Customer')"),
@@ -496,7 +496,7 @@ def page_preview():
             st.rerun()
     with header_cols[1]:
         st.markdown(f"<h2 style='text-align: center;'>{_t('2. Preview')}</h2>", unsafe_allow_html=True)
-    
+
     # --- Progress Indicator ---
     render_step_indicator(2)
     st.markdown("<br>", unsafe_allow_html=True)
@@ -523,7 +523,7 @@ def page_preview():
         with st.container(border=True):
             st.text_input(_t("Recipient"), value="{{Email}}>", disabled=True)
 
-            
+
             st.session_state.editable_subject = st.text_input(
                 _t("Subject"),
                 value=st.session_state.editable_subject,
@@ -538,7 +538,7 @@ def page_preview():
 
     with col2:
         with st.container(border=True):
-            
+
             if st.session_state.contacts:
                 first_contact = st.session_state.contacts[0]
                 preview_name = first_contact.get('name', '')
@@ -560,7 +560,7 @@ def page_preview():
                     for ph in ["{{Name}}","{{Nom}}","{{Email}}","{{Courriel}}"]:
                         preview_subj = preview_subj.replace(ph, "")
                         preview_body = preview_body.replace(ph, "")
-                
+
                 st.text_input(_t("Subject"), value=preview_subj, disabled=True, key="preview_subj_display")
                 st.text_area(_t("Body"), value=preview_body, height=350, disabled=True, key="preview_body_display")
             else:
@@ -630,12 +630,12 @@ def page_results():
         st.metric(_t("Emails Sent Successfully"), successful)
     with col3:
         st.metric(_t("Emails Failed to Send"), failed)
-    
+
     st.markdown("---")
     if st.button(_t("Show Activity Log and Errors"), use_container_width=True, key="show_log_button"):
         st.subheader(_t("Activity Log"))
         # Using a container to display log entries dynamically
-        log_display_container = st.container() 
+        log_display_container = st.container()
         if st.session_state.email_sending_status:
             for log_entry in st.session_state.email_sending_status:
                 # Check for different types of log entries and format accordingly
@@ -655,10 +655,10 @@ def page_results():
     if st.button(_t("Start New Email Session"), use_container_width=True, key="start_new_session_button", type="primary"):
         # Clear all relevant session state variables
         keys_to_clear = [
-            'initialized', 'language', 'page', 'contacts', 'contact_issues', 
+            'initialized', 'language', 'page', 'contacts', 'contact_issues',
             'attachments', 'email_sending_status', 'sending_summary', 'detailed_response',
-            'generation_in_progress', 'sending_in_progress', 'user_prompt', 
-            'user_email_context', 'personalize_emails', 'generic_greeting', 
+            'generation_in_progress', 'sending_in_progress', 'user_prompt',
+            'user_email_context', 'personalize_emails', 'generic_greeting',
             'template_subject', 'template_body', 'editable_subject', 'editable_body',
             'uploaded_file_name', 'show_generation_section', 'email_generated'
         ]

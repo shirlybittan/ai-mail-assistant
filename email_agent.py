@@ -14,7 +14,7 @@ class SmartEmailAgent:
     def __init__(self, openai_api_key=OPENAI_API_KEY, model="gpt-4o"):
         if not openai_api_key:
             raise ValueError("OpenAI API Key is required for SmartEmailAgent.")
-            
+
         self.openai_api_key = openai_api_key
         # Initialize the OpenAI client here
         self.client = openai.OpenAI(api_key=self.openai_api_key)
@@ -24,7 +24,7 @@ class SmartEmailAgent:
         """
         Generates an email subject and body template using OpenAI's GPT model.
         The template will contain placeholders like {{Name}} and {{Email}}.
-        
+
         Args:
             prompt (str): The user's request for the email content.
             user_email_context (str): Additional context or style preferences for the email.
@@ -35,7 +35,7 @@ class SmartEmailAgent:
             dict: A dictionary containing 'subject' and 'body' of the generated email template.
                   Returns error message if generation fails.
         """
-        
+
         personalization_hint = ""
         if personalize_emails:
             # If personalization is ON, instruct AI to use placeholders.
@@ -70,7 +70,7 @@ class SmartEmailAgent:
                 ],
                 response_format={"type": "json_object"}
             )
-            
+
             # Extract content and parse JSON
             response_content = response.choices[0].message.content
             email_template = json.loads(response_content)
@@ -78,7 +78,7 @@ class SmartEmailAgent:
             # Basic validation
             if "subject" not in email_template or "body" not in email_template:
                 raise ValueError("AI response missing 'subject' or 'body' key.")
-            
+
             # Clean up body to remove potential leading/trailing whitespace or accidental AI salutations
             email_template['body'] = email_template['body'].strip()
             # Further refinement: Remove common salutations if they accidentally slipped through
@@ -109,7 +109,7 @@ if __name__ == '__main__':
     # load_dotenv() # Load environment variables from .env file
 
     agent = SmartEmailAgent(openai_api_key=os.getenv("OPENAI_API_KEY"))
-    
+
     user_instruction = "Craft a follow-up email to new users. Thank them for signing up and offer a link to the tutorial."
 
     print("--- Testing Template Agent (Personalized) ---")
