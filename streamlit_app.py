@@ -1,17 +1,15 @@
-# streamlit_app.py
-
 import streamlit as st
 import pandas as pd
-from data_handler import load_contacts_from_excel
-from email_agent import SmartEmailAgent
-from email_tool import send_bulk_email_messages
-from config import SENDER_EMAIL, OPENAI_API_KEY, FAILED_EMAILS_LOG_PATH, BREVO_API_KEY
-from translations import LANGUAGES, _t, set_language
-import datetime
 import os
 import shutil
 import tempfile
 import re
+from data_handler import load_contacts_from_excel # Assuming this exists
+from email_agent import SmartEmailAgent # Assuming this exists
+from email_tool import send_bulk_email_messages, get_email_events
+from config import SENDER_EMAIL, OPENAI_API_KEY, BREVO_API_KEY # Assuming these exist
+from translations import LANGUAGES, _t, set_language # Assuming these exist
+import datetime
 
 # --- CSS Styling ---
 st.markdown("""
@@ -48,7 +46,7 @@ div.stActionButton, div.stDownloadButton, div.stFileUploadDropzone {
 
 .stButton>button:hover {
     border-color: #2563eb; /* Blue border on hover */
-    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    box-shadow: 0 44px 10px rgba(0,0,0,0.1);
 }
 
 /* Styling for the SELECTED language button (primary type) */
@@ -116,8 +114,13 @@ def init_state():
         st.session_state.uploaded_file_name = None # To track if the file has changed by name
         st.session_state.show_generation_section = False # Control visibility of AI generation form
         st.session_state.email_generated = False # New flag to control display of generated email fields
+        st.session_state.message_details = [] # NEW: To store structured message IDs and their events
         st.session_state.initialized = True
 init_state()
+
+# Ensure message_details is initialized at the top level
+if "message_details" not in st.session_state:
+    st.session_state.message_details = []
 
 # --- Language Selection (moved to main content area) ---
 # Apply the selected language immediately after initialization
@@ -260,6 +263,21 @@ def generate_email_preview_and_template():
     st.session_state.page = 'preview' # Set page to preview after generation
     st.rerun() # Rerun to display the generated email
 
+# NEW: Function to refresh events for a specific message ID
+def refresh_message_events(message_id, message_index):
+    st.session_state.email_sending_status.append(f"Refreshing events for message ID: {message_id}...")
+    try:
+        new_events_data = get_email_events([message_id])
+        if message_id in new_events_data:
+            st.session_state.message_details[message_index]['events'] = new_events_data[message_id]
+            st.session_state.email_sending_status.append(f"✅ Events refreshed for {message_id}.")
+        else:
+            st.session_state.email_sending_status.append(f"⚠️ Could not find events for {message_id}.")
+    except Exception as e:
+        st.session_state.email_sending_status.append(f"❌ Error refreshing events for {message_id}: {e}")
+    st.rerun()
+
+
 def send_all_emails():
     st.session_state.sending_in_progress = True
     total_contacts = len(st.session_state.contacts)
@@ -334,12 +352,18 @@ def send_all_emails():
         status.append(_t("📧 Total emails sent: ") + str(success))
         status.append(_t("📊 Success rate: ") + f"{success}/{total_contacts} ({(success/total_contacts*100):.1f}%)")
         
-        # Add individual message IDs if available
+        # NEW: Populate st.session_state.message_details with structured data
+        st.session_state.message_details = []
         if message_ids:
-            status.append(f"📋 Message IDs received: {len(message_ids)}")
+            # Fetch initial events (if any) for all messages
+            email_events_initial = get_email_events(message_ids)
             for i, msg_id in enumerate(message_ids, 1):
                 recipient_email = messages[i-1]['to_email'] if i <= len(messages) else f"Recipient {i}"
-                status.append(f"   {i}. {recipient_email}: {msg_id}")
+                st.session_state.message_details.append({
+                    'recipient': recipient_email,
+                    'message_id': msg_id,
+                    'events': email_events_initial.get(msg_id, []) # Store initial events
+                })
         
         if fail > 0:
             status.append(f"⚠️ {fail} emails failed to send")
@@ -351,10 +375,14 @@ def send_all_emails():
         success = int(success_match.group(1)) if success_match else 0
         fail = total_contacts - success
         status.append(f"⚠️ Partial success: {result_message}")
+        # For partial success, we might not have message_ids for all,
+        # so we'll just log the overall status.
+        st.session_state.message_details = [] # Clear any previous details
     else:
         success = 0
         fail = total_contacts
         status.append(f"❌ Bulk send failed: {result_message}")
+        st.session_state.message_details = [] # Clear any previous details
 
     st.session_state.email_sending_status = status
     st.session_state.sending_summary = {
@@ -377,7 +405,7 @@ def page_generate():
     st.markdown("---")
     st.markdown(f"**{_t('Sender Email')}:** `{SENDER_EMAIL if SENDER_EMAIL else _t('Not configured')}`")
     if not SENDER_EMAIL or not BREVO_API_KEY:
-        st.warning(_t("Sender email credentials are not configured. Please set SENDER_EMAIL and SENDER_PASSWORD in Streamlit secrets."))
+        st.warning(_t("Sender email credentials are not configured. Please set SENDER_EMAIL and BREVO_API_KEY in Streamlit secrets."))
     st.markdown("---")
 
     # --- File Upload ---
@@ -521,8 +549,7 @@ def page_preview():
 
     with col1:
         with st.container(border=True):
-            st.text_input(_t("Recipient"), value="{{Email}}>", disabled=True)
-
+            st.text_input(_t("Recipient"), value="Recipient <email@example.com>", disabled=True)
             
             st.session_state.editable_subject = st.text_input(
                 _t("Subject"),
@@ -632,6 +659,31 @@ def page_results():
         st.metric(_t("Emails Failed to Send"), failed)
     
     st.markdown("---")
+    # Display individual message details and refresh buttons
+    if st.session_state.message_details:
+        st.subheader(_t("Individual Email Status & Events"))
+        for i, msg_detail in enumerate(st.session_state.message_details):
+            with st.expander(f"Recipient: {msg_detail['recipient']} | Message ID: {msg_detail['message_id']}"):
+                st.markdown(f"**Recipient:** `{msg_detail['recipient']}`")
+                st.markdown(f"**Message ID:** `{msg_detail['message_id']}`")
+                
+                # Refresh button for this specific message
+                if st.button(_t("Refresh Events for this Email"), key=f"refresh_event_{msg_detail['message_id']}_{i}"):
+                    refresh_message_events(msg_detail['message_id'], i)
+                
+                st.markdown("**Events:**")
+                if msg_detail['events']:
+                    for event in msg_detail['events']:
+                        event_type = event.get('event', 'N/A')
+                        event_date = event.get('_date', 'N/A')
+                        reason = event.get('reason', 'N/A')
+                        st.markdown(f"- **Type:** `{event_type}` | **Date:** `{event_date}` | **Reason:** `{reason}`")
+                else:
+                    st.info(_t("No events found yet for this message. Click 'Refresh Events' to check."))
+    else:
+        st.info(_t("No detailed message status available."))
+
+    st.markdown("---")
     if st.button(_t("Show Activity Log and Errors"), use_container_width=True, key="show_log_button"):
         st.subheader(_t("Activity Log"))
         # Using a container to display log entries dynamically
@@ -660,7 +712,8 @@ def page_results():
             'generation_in_progress', 'sending_in_progress', 'user_prompt', 
             'user_email_context', 'personalize_emails', 'generic_greeting', 
             'template_subject', 'template_body', 'editable_subject', 'editable_body',
-            'uploaded_file_name', 'show_generation_section', 'email_generated'
+            'uploaded_file_name', 'show_generation_section', 'email_generated',
+            'message_details' # NEW: Clear message_details
         ]
         for k in keys_to_clear:
             if k in st.session_state:
