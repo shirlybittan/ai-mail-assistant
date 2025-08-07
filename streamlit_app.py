@@ -30,6 +30,62 @@ body {
 div.stActionButton, div.stDownloadButton, div.stFileUploadDropzone {
     margin-bottom: 0.5rem; /* Adjust as needed */
 }
+
+/* Custom button styling for language selection */
+.stButton>button {
+    width: 100%; /* Make buttons take full column width */
+    height: 3em; /* Make buttons a bit taller */
+    font-size: 1.1em;
+    font-weight: bold;
+    border-radius: 8px;
+    transition: all 0.2s ease-in-out;
+    /* Default for secondary buttons (unselected) */
+    border: 1px solid #ccc;
+    background-color: white;
+    color: #333;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.stButton>button:hover {
+    border-color: #2563eb; /* Blue border on hover */
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+/* Styling for the SELECTED language button (primary type) */
+.stButton button[kind="primary"] {
+    background-color: #2563eb; /* Strong blue background */
+    color: white; /* White text */
+    border-color: #2563eb; /* Blue border */
+    font-weight: bold; /* Make it bolder */
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2); /* More prominent shadow */
+}
+
+/* Hover effect for the primary (selected) button too */
+.stButton button[kind="primary"]:hover {
+    background-color: #1a4fbd; /* Slightly darker blue on hover */
+    border-color: #1a4fbd;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+# --- Language Selection (moved to main content area) ---
+st.markdown("""
+<style>
+/* — ENGLISH button: use UK flag as background image — */
+div.st-key-lang_button_en button {
+    padding-left: 28px !important;              /* make room for the icon */
+    background-image: url('https://flagcdn.com/16x12/gb.png') !important;
+    background-repeat: no-repeat !important;
+    background-position: 6px center !important;
+}
+/* — FRENCH button: use French flag — */
+div.st-key-lang_button_fr button {
+    padding-left: 28px !important;
+    background-image: url('https://flagcdn.com/16x12/fr.png') !important;
+    background-repeat: no-repeat !important;
+    background-position: 6px center !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -46,6 +102,7 @@ def init_state():
         st.session_state.attachments = [] # Stores UploadedFile objects
         st.session_state.email_sending_status = []
         st.session_state.sending_summary = {'total_contacts':0, 'successful':0, 'failed':0}
+        st.session_state.detailed_response = None
         st.session_state.generation_in_progress = False
         st.session_state.sending_in_progress = False
         st.session_state.user_prompt = ''
@@ -62,22 +119,48 @@ def init_state():
         st.session_state.initialized = True
 init_state()
 
-# --- Language Selection (moved up for immediate effect) ---
-with st.sidebar:
-    chosen_lang = st.selectbox(
-        _t("Language"), # Now translated
-        options=list(LANGUAGES.keys()),
-        format_func=lambda x: LANGUAGES[x], # Display full language name
-        index=list(LANGUAGES.keys()).index(st.session_state.language),
-        key="language_selector"
-    )
-    if chosen_lang != st.session_state.language:
-        st.session_state.language = chosen_lang
-        set_language(chosen_lang)
-        st.rerun()
-
-# Apply the selected language immediately after initialization and selection
+# --- Language Selection (moved to main content area) ---
+# Apply the selected language immediately after initialization
 set_language(st.session_state.language)
+
+# Dictionary to map language codes to display strings
+LANGUAGE_BUTTON_LABELS = {
+    "en": "EN",
+    "fr": "FR",
+}
+
+# Use st.columns to place the language selector on the right of a potential title
+col_title, col_lang = st.columns([8, 2])
+
+with col_lang:
+    # Use columns for language selection buttons
+    lang_col1, lang_col2 = st.columns(2)
+    
+    with lang_col1:
+        if st.button(
+            LANGUAGE_BUTTON_LABELS["en"],
+            key="lang_button_en",
+            # Logic: primary (blue) if selected, secondary (white) if not
+            type="primary" if st.session_state.language == "en" else "secondary", 
+            use_container_width=True
+        ):
+            st.session_state.language = "en"
+            set_language("en")
+            st.rerun()
+    with lang_col2:
+        if st.button(
+            LANGUAGE_BUTTON_LABELS["fr"],
+            key="lang_button_fr",
+            # Logic: primary (blue) if selected, secondary (white) if not
+            type="primary" if st.session_state.language == "fr" else "secondary", 
+            use_container_width=True
+        ):
+            st.session_state.language = "fr"
+            set_language("fr")
+            st.rerun()
+
+with col_title:
+    st.title(_t("AI Email Assistant")) # Main application title
 
 # --- UI Helpers ---
 def render_step_indicator(current_step: int):
@@ -241,20 +324,37 @@ def send_all_emails():
     result_message = result.get("message", "")
     
     if result_status == "success":
-        success = len(messages)
-        fail = 0
-        status.append(f"Bulk send succeeded: {success} emails sent successfully.")
+        message_ids = result.get("message_ids", [])
+        total_sent = result.get("total_sent", len(messages))
+        success = total_sent
+        fail = total_contacts - success
+        
+        # Add detailed status information
+        status.append(_t("✅ Bulk send completed successfully!"))
+        status.append(_t("📧 Total emails sent: ") + str(success))
+        status.append(_t("📊 Success rate: ") + f"{success}/{total_contacts} ({(success/total_contacts*100):.1f}%)")
+        
+        # Add individual message IDs if available
+        if message_ids:
+            status.append(f"📋 Message IDs received: {len(message_ids)}")
+            for i, msg_id in enumerate(message_ids, 1):
+                recipient_email = messages[i-1]['to_email'] if i <= len(messages) else f"Recipient {i}"
+                status.append(f"   {i}. {recipient_email}: {msg_id}")
+        
+        if fail > 0:
+            status.append(f"⚠️ {fail} emails failed to send")
+            
     elif result_status == "partial_success":
         # Extract success count from message
         import re
         success_match = re.search(r'(\d+) emails sent successfully', result_message)
         success = int(success_match.group(1)) if success_match else 0
         fail = total_contacts - success
-        status.append(f"Partial success: {result_message}")
+        status.append(f"⚠️ Partial success: {result_message}")
     else:
         success = 0
         fail = total_contacts
-        status.append(f"Bulk send failed: {result_message}")
+        status.append(f"❌ Bulk send failed: {result_message}")
 
     st.session_state.email_sending_status = status
     st.session_state.sending_summary = {
@@ -262,13 +362,15 @@ def send_all_emails():
         'successful': success,
         'failed': fail
     }
+    # Store detailed response data for the results page
+    st.session_state.detailed_response = result
     st.session_state.page = 'results'
     st.session_state.sending_in_progress = False
     st.rerun()
 
 # --- Page: Generate ---
 def page_generate():
-    st.subheader(_t("1. Email Generation"))
+    st.subheader(_t("1. Generation"))
     render_step_indicator(1)
 
     # --- Sender Information (Always visible at the top) ---
@@ -364,105 +466,145 @@ def page_generate():
 
 # --- Page: Preview ---
 def page_preview():
-    st.subheader(_t("2. Preview & Attachments"))
-    render_step_indicator(2)
+    # --- Custom CSS for this page ---
+    st.markdown("""
+    <style>
+        /* Style for the blue instruction text */
+        .info-text-blue {
+            color: #0d6efd;
+            font-size: 1em;
+            margin-bottom: 2rem;
+        }
+        /* Style for the black instruction text */
+        .info-text-normal {
+             font-size: 1em;
+             margin-bottom: 2rem;
+        }
+        /* Enlarge titles inside boxes */
+        h4 {
+            font-size: 1.25em;
+            font-weight: 600;
+        }
+    </style>
+    """, unsafe_allow_html=True)
 
+    # --- Header: Back Button and Centered Title ---
+    header_cols = st.columns([0.25, 0.5, 0.25])
+    with header_cols[0]:
+        if st.button(f"← {_t('Back to Generation')}", use_container_width=True):
+            st.session_state.page = 'generate'
+            st.rerun()
+    with header_cols[1]:
+        st.markdown(f"<h2 style='text-align: center;'>{_t('2. Preview')}</h2>", unsafe_allow_html=True)
+    
+    # --- Progress Indicator ---
+    render_step_indicator(2)
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # --- Section Titles (above the boxes) ---
+    title_cols = st.columns(2)
+    with title_cols[0]:
+        st.markdown(f"<h4>{_t('Editable Email Content')}</h4>", unsafe_allow_html=True)
+        st.markdown(
+            f"<div class='info-text-blue'>{_t('Edit the email template here. Changes will reflect in the live preview.')}</div>",
+            unsafe_allow_html=True
+        )
+    with title_cols[1]:
+        st.markdown(f"<h4>{_t('Live Preview for First Contact')}</h4>", unsafe_allow_html=True)
+        st.markdown(
+            f"<div class='info-text-normal'>{_t('This shows how the email will appear for the first contact. To make changes, use the *Editable Email Content* section on the left.')}</div>",
+            unsafe_allow_html=True
+        )
+
+    # --- Main Content Columns (the actual boxes) ---
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown(f"**{_t('Editable Email Content')}**")
-        st.info(_t("Edit the email template here. Changes will reflect in the live preview."))
-        st.session_state.editable_subject = st.text_input(
-            _t("Subject"),
-            value=st.session_state.editable_subject,
-            key="preview_subject_input"
-        )
-        st.session_state.editable_body = st.text_area(
-            _t("Body"),
-            value=st.session_state.editable_body,
-            height=400,
-            key="preview_body_input"
-        )
-        st.markdown("---")
-        # Button to go back to generation
-        if st.button(_t("Back to Generation"), use_container_width=True, key="back_to_generation_button", type="primary"):
-            st.session_state.page = 'generate'
-            st.rerun()
+        with st.container(border=True):
+            st.text_input(_t("Recipient"), value="{{Email}}>", disabled=True)
+
+            
+            st.session_state.editable_subject = st.text_input(
+                _t("Subject"),
+                value=st.session_state.editable_subject,
+                key="preview_subject_input"
+            )
+            st.session_state.editable_body = st.text_area(
+                _t("Body"),
+                value=st.session_state.editable_body,
+                height=350,
+                key="preview_body_input"
+            )
 
     with col2:
-        st.markdown(f"**{_t('Live Preview for First Contact')}**")
-        st.info(_t("This shows how the email will appear for the first contact. To make changes, use the 'Editable Email Content' section on the left."))
-        if st.session_state.contacts:
-            first_contact = st.session_state.contacts[0]
-            preview_name = first_contact.get('name', '')
-            preview_email = first_contact.get('email', '')
+        with st.container(border=True):
+            
+            if st.session_state.contacts:
+                first_contact = st.session_state.contacts[0]
+                preview_name = first_contact.get('name', '')
+                preview_email = first_contact.get('email', '')
 
-            # Apply personalization for preview
-            preview_subj = st.session_state.editable_subject
-            preview_body = st.session_state.editable_body # Body already contains generic greeting if applicable
+                st.text_input(_t("Recipient"), value=f"{preview_name} <{preview_email}>", disabled=True)
 
-            if st.session_state.personalize_emails:
-                # Replace {{Name}}, {{Nom}}, {{Email}}, {{Courriel}} placeholders with actual contact data
-                for placeholder in ["{{Name}}", "{{Nom}}"]:
-                    preview_subj = preview_subj.replace(placeholder, preview_name)
-                    preview_body = preview_body.replace(placeholder, preview_name)
+                preview_subj = st.session_state.editable_subject
+                preview_body = st.session_state.editable_body
 
-                for placeholder in ["{{Email}}", "{{Courriel}}"]:
-                    preview_subj = preview_subj.replace(placeholder, preview_email)
-                    preview_body = preview_body.replace(placeholder, preview_email)
+                if st.session_state.personalize_emails:
+                    for placeholder in ["{{Name}}", "{{Nom}}"]:
+                        preview_subj = preview_subj.replace(placeholder, preview_name)
+                        preview_body = preview_body.replace(placeholder, preview_name)
+                    for placeholder in ["{{Email}}", "{{Courriel}}"]:
+                        preview_subj = preview_subj.replace(placeholder, preview_email)
+                        preview_body = preview_body.replace(placeholder, preview_email)
+                else:
+                    for ph in ["{{Name}}","{{Nom}}","{{Email}}","{{Courriel}}"]:
+                        preview_subj = preview_subj.replace(ph, "")
+                        preview_body = preview_body.replace(ph, "")
+                
+                st.text_input(_t("Subject"), value=preview_subj, disabled=True, key="preview_subj_display")
+                st.text_area(_t("Body"), value=preview_body, height=350, disabled=True, key="preview_body_display")
             else:
-                # For generic emails, ensure subject and body do not contain any personalization placeholders
-                preview_subj = preview_subj.replace("{{Name}}", "").replace("{{Email}}", "").replace("{{Nom}}", "").replace("{{Courriel}}", "")
-                preview_body = preview_body.replace("{{Name}}", "").replace("{{Email}}", "").replace("{{Nom}}", "").replace("{{Courriel}}", "")
+                st.info(_t("Upload contacts in the first step to see a preview."))
 
-            st.text_input(_t("Recipient"), value=f"{preview_name} <{preview_email}>") # Removed disabled=True
-            st.text_input(_t("Subject"), value=preview_subj) # Removed disabled=True
-            # Display the body using st.text_area, removed disabled=True
-            st.text_area(_t("Body"), value=preview_body, height=350) 
-        else:
-            st.info(_t("Upload contacts in the first step to see a preview."))
+    # --- Attachments Section (spans full width) ---
+    st.markdown("---")
+    st.markdown(f"**{_t('Add Attachments')}**")
+    uploaded_attachments = st.file_uploader(
+        _t("Upload files"),
+        type=None,
+        accept_multiple_files=True,
+        key="attachment_uploader"
+    )
+    if uploaded_attachments:
+        for uploaded_file in uploaded_attachments:
+            if not any(att.name == uploaded_file.name for att in st.session_state.attachments):
+                st.session_state.attachments.append(uploaded_file)
+        st.info(_t("Attachments selected: {count}", count=len(st.session_state.attachments)))
 
-        st.markdown("---")
-        st.markdown(f"**{_t('Add Attachments')}**")
-        uploaded_attachments = st.file_uploader(
-            _t("Upload files"),
-            type=None, # Allow all file types
-            accept_multiple_files=True,
-            key="attachment_uploader"
-        )
-        if uploaded_attachments:
-            # Clear previous attachments if new ones are uploaded
-            # st.session_state.attachments = [] # Decide if you want to replace or append
-            for uploaded_file in uploaded_attachments:
-                # Check if file is already in attachments to avoid duplicates by name
-                if not any(att.name == uploaded_file.name for att in st.session_state.attachments):
-                    st.session_state.attachments.append(uploaded_file)
-            st.info(_t("Attachments selected: {count}", count=len(st.session_state.attachments)))
-        
-        if st.session_state.attachments:
-            st.markdown(f"**{_t('Current Attachments')}**")
-            for i, att in enumerate(st.session_state.attachments):
-                col_att_name, col_att_remove = st.columns([0.8, 0.2])
-                with col_att_name:
-                    st.write(f"- {att.name}")
-                with col_att_remove:
-                    if st.button("X", key=f"remove_attachment_{i}"):
-                        st.session_state.attachments.pop(i)
-                        st.rerun() # Rerun to update the list
-
+    if st.session_state.attachments:
+        st.markdown(f"**{_t('Current Attachments')}**")
+        for i, att in enumerate(st.session_state.attachments):
+            col_att_name, col_att_remove = st.columns([0.8, 0.2])
+            with col_att_name:
+                st.write(f"- {att.name}")
+            with col_att_remove:
+                if st.button("X", key=f"remove_attachment_{i}"):
+                    st.session_state.attachments.pop(i)
+                    st.rerun()
 
     st.markdown("---")
+    # --- Final Send Button ---
     if st.button(_t("Confirm Send"), use_container_width=True, key="confirm_send_button", disabled=st.session_state.sending_in_progress, type="primary"):
         if not st.session_state.contacts:
             st.warning(_t("No contacts loaded to send emails to."))
         elif not st.session_state.editable_subject or not st.session_state.editable_body:
             st.warning(_t("Subject and Body cannot be empty. Please go back to Generation if needed."))
         else:
-            send_all_emails() # This will transition to the results page
+            send_all_emails()
 
 # --- Page: Results ---
 def page_results():
-    st.subheader(_t("3. Sending Results"))
+    st.subheader(_t("3. Results"))
     render_step_indicator(3)
 
     summary = st.session_state.sending_summary
@@ -496,10 +638,16 @@ def page_results():
         log_display_container = st.container() 
         if st.session_state.email_sending_status:
             for log_entry in st.session_state.email_sending_status:
-                if "error" in log_entry.lower() or "failed" in log_entry.lower():
+                # Check for different types of log entries and format accordingly
+                if "❌" in log_entry or "error" in log_entry.lower() or "failed" in log_entry.lower():
                     log_display_container.error(log_entry)
-                elif "success" in log_entry.lower():
+                elif "✅" in log_entry or "success" in log_entry.lower():
                     log_display_container.success(log_entry)
+                elif "📋" in log_entry or log_entry.strip().startswith("   "):  # Message ID entries
+                    # Use a special container for message IDs with monospace font
+                    log_display_container.markdown(f"```{log_entry}```")
+                elif "⚠️" in log_entry:
+                    log_display_container.warning(log_entry)
                 else:
                     log_display_container.info(log_entry)
 
@@ -508,7 +656,7 @@ def page_results():
         # Clear all relevant session state variables
         keys_to_clear = [
             'initialized', 'language', 'page', 'contacts', 'contact_issues', 
-            'attachments', 'email_sending_status', 'sending_summary', 
+            'attachments', 'email_sending_status', 'sending_summary', 'detailed_response',
             'generation_in_progress', 'sending_in_progress', 'user_prompt', 
             'user_email_context', 'personalize_emails', 'generic_greeting', 
             'template_subject', 'template_body', 'editable_subject', 'editable_body',

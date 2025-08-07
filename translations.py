@@ -30,6 +30,9 @@ TRANSLATIONS = {
         "1. Generation": "1. Generation",
         "2. Preview": "2. Preview",
         "3. Results": "3. Results",
+        "Generation & Setup": "Generation & Setup",
+        "Preview & Send": "Preview & Send",
+        "Results": "Results",
         "Upload Excel (.xlsx/.xls)": "Upload an Excel file with contacts (.xlsx/.xls)",
         "Successfully loaded {count} valid contacts.": "Successfully loaded {count} valid contacts.",
         "Please upload an Excel file to get started.": "Please upload an Excel file to get started.",
@@ -48,6 +51,7 @@ TRANSLATIONS = {
         "Live Preview for First Contact": "Live Preview for First Contact",
         "Upload contacts in the first step to see a preview.": "Upload contacts in the first step to see a preview.",
         "Add Attachments": "Add Attachments",
+        "Upload files": "Upload files",
         "Attachments selected: {count}": "Attachments selected: {count}",
         "Current Attachments": "Current Attachments",
         "Confirm Send": "Confirm Send",
@@ -59,10 +63,14 @@ TRANSLATIONS = {
         "Sending complete with errors.": "Sending complete with errors.",
         "Some emails failed to send. Please check the log below for details.": "Some emails failed to send. Please check the log below for details.",
         "Summary": "Summary",
-        "Total Contacts": "Total Contacts",
-        "Emails Successfully Sent": "Emails Successfully Sent",
+        "Total Contacts Processed": "Total Contacts Processed",
+        "Emails Sent Successfully": "Emails Sent Successfully",
         "Emails Failed to Send": "Emails Failed to Send",
         "Show Activity Log and Errors": "Show Activity Log and Errors",
+        "Activity Log": "Activity Log",
+        "✅ Bulk send completed successfully!": "✅ Bulk send completed successfully!",
+        "📧 Total emails sent: ": "📧 Total emails sent: ",
+        "📊 Success rate: ": "📊 Success rate: ",
         "Start New Email Session": "Start New Email Session",
         "No emails were processed.": "No emails were processed.",
         "Sender Email": "Sender Email",
@@ -72,7 +80,7 @@ TRANSLATIONS = {
         "Language": "Language", # For the sidebar selectbox label
         "Dear": "Dear", # Added for dynamic salutation prefix
         "Edit the email template here. Changes will reflect in the live preview.": "Edit the email template here. Changes will reflect in the live preview.", # New info text for editable section
-        "This shows how the email will appear for the first contact. To make changes, use the 'Editable Email Content' section on the left.": "This shows how the email will appear for the first contact. To make changes, use the 'Editable Email Content' section on the left." # New info text for preview section
+        "This shows how the email will appear for the first contact. To make changes, use the *Editable Email Content* section on the left.": "This shows how the email will appear for the first contact. To make changes, use the 'Editable Email Content' section on the left." # New info text for preview section
     },
     "fr": {
         "AI Email Assistant": "Assistant d'E-mail IA",
@@ -96,6 +104,9 @@ TRANSLATIONS = {
         "1. Generation": "1. Génération",
         "2. Preview": "2. Prévisualisation",
         "3. Results": "3. Résultats",
+        "Generation & Setup": "Génération & Configuration",
+        "Preview & Send": "Prévisualisation & Envoi",
+        "Results": "Résultats",
         "Upload Excel (.xlsx/.xls)": "Importer un fichier Excel (.xlsx/.xls)",
         "Successfully loaded {count} valid contacts.": "Chargement réussi de {count} contacts valides.",
         "Please upload an Excel file to get started.": "Veuillez importer un fichier Excel pour commencer.",
@@ -114,6 +125,7 @@ TRANSLATIONS = {
         "Live Preview for First Contact": "Aperçu en direct pour le premier contact",
         "Upload contacts in the first step to see a preview.": "Importez des contacts à la première étape pour voir un aperçu.",
         "Add Attachments": "Ajouter des pièces jointes",
+        "Upload files": "Importer des fichiers",
         "Attachments selected: {count}": "Pièces jointes sélectionnées : {count}",
         "Current Attachments": "Pièces jointes actuelles",
         "Confirm Send": "Confirmer l'envoi",
@@ -125,10 +137,14 @@ TRANSLATIONS = {
         "Sending complete with errors.": "Envoi terminé avec des erreurs.",
         "Some emails failed to send. Please check the log below for details.": "Certains e-mails n'ont pas pu être envoyés. Veuillez consulter le journal ci-dessous pour plus de détails.",
         "Summary": "Résumé",
-        "Total Contacts": "Total des contacts",
-        "Emails Successfully Sent": "E-mails envoyés avec succès",
+        "Total Contacts Processed": "Total des contacts traités",
+        "Emails Sent Successfully": "E-mails envoyés avec succès",
         "Emails Failed to Send": "E-mails échoués",
         "Show Activity Log and Errors": "Afficher le journal d'activité et les erreurs",
+        "Activity Log": "Journal d'activité",
+        "✅ Bulk send completed successfully!": "✅ Envoi de masse terminé avec succès !",
+        "📧 Total emails sent: ": "📧 Total d'e-mails envoyés : ",
+        "📊 Success rate: ": "📊 Taux de succès : ",
         "Start New Email Session": "Commencer une nouvelle session d'e-mail",
         "No emails were processed.\n": "Aucun e-mail n'a été traité.",
         "Sender Email": "E-mail de l'expéditeur",
@@ -138,7 +154,7 @@ TRANSLATIONS = {
         "Language": "Langue",
         "Dear": "Bonjour", # Added for dynamic salutation prefix (translated to Bonjour for French)
         "Edit the email template here. Changes will reflect in the live preview.": "Modifiez le modèle d'e-mail ici. Les modifications se refléteront dans l'aperçu en direct.",
-        "This shows how the email will appear for the first contact. To make changes, use the 'Editable Email Content' section on the left.": "Ceci montre l'apparence de l'e-mail pour le premier contact. Pour apporter des modifications, utilisez la section 'Contenu de l'e-mail modifiable' sur la gauche."
+        "This shows how the email will appear for the first contact. To make changes, use the *Editable Email Content* section on the left.": "Ceci montre l'apparence de l'e-mail pour le premier contact. Pour apporter des modifications, utilisez la section 'Contenu de l'e-mail modifiable' sur la gauche."
     }
 }
 
